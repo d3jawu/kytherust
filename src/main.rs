@@ -6,14 +6,6 @@ fn main() -> Result<(), Error> {
     Ok(())
 }
 
-pub enum Token {
-    Sym,   // symbol
-    Str,   // string literal
-    Num,   // number literal
-    Kw,    // language-defined keyword
-    Ident, // user-defined identifier
-}
-
 mod input_stream {
     use std::fs;
     use std::io::Error;
@@ -53,22 +45,89 @@ mod input_stream {
             next
         }
 
-        pub fn peek(&self) -> String {
-            self.body[self.pos].clone()
+        pub fn peek(&self) -> Option<String> {
+            if self.eof() {
+                None
+            } else {
+                Some(self.body[self.pos].clone())
+            }
         }
 
         pub fn peek_next(&self) -> Option<String> {
-            self.body[self.pos + 1].clone()?
+            if self.pos + 1 >= self.body.len() {
+                None
+            } else {
+                Some(self.body[self.pos + 1].clone())
+            }
         }
 
         pub fn eof(&self) -> bool {
-            self.pos == self.body.len()
+            self.pos >= self.body.len()
+        }
+
+        pub fn read_while(&mut self, condition: impl Fn(String) -> bool) -> Option<String> {
+            let mut output: String = "".to_string();
+
+            while !self.eof() && condition(self.peek()?) {
+                output = format!("{}{}", output, self.next());
+            }
+
+            Some(output)
         }
     }
 }
 
 mod tokenizer {
-    struct Tokenizer {}
+    use std::io::Error;
 
-    impl Tokenizer {}
+    use crate::input_stream::{self, InputStream};
+
+    pub enum Token {
+        Sym(String),   // symbol
+        Str(String),   // string literal
+        Num(f64),      // number literal
+        Kw(Keyword),   // language-defined keyword
+        Ident(String), // user-defined identifier
+    }
+
+    pub enum Keyword {
+        CONST,
+        LET,
+        IF,
+        ELSE,
+        WHILE,
+        WHEN,
+        BREAK,
+        RETURN,
+        CONTINUE,
+        TYPEOF,
+    }
+    pub struct Tokenizer {
+        current: Option<Token>,
+        stream: input_stream::InputStream,
+    }
+
+    impl Tokenizer {
+        pub fn new(path: &str) -> Result<Tokenizer, Error> {
+            Ok(Tokenizer {
+                current: None,
+                stream: InputStream::new(path)?,
+            })
+        }
+
+        fn read_while(&mut self, condition: impl Fn(String) -> bool) {}
+
+        // read current token and move to next
+        pub fn consume(&mut self) -> Option<Token> {}
+
+        // read current token without consuming it
+        pub fn peek(&mut self) -> Option<Token> {
+            
+        }
+
+        // parse one token from input stream into self.current
+        fn next(&mut self) {
+            let raw: String = self.stream.next();
+        }
+    }
 }
