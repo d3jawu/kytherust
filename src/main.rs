@@ -30,7 +30,7 @@ mod input_stream {
             })
         }
 
-        pub fn next(&mut self) -> String {
+        pub fn consume(&mut self) -> String {
             let next: String = self.body[self.pos].clone();
 
             self.pos += 1;
@@ -69,16 +69,24 @@ mod input_stream {
             let mut output: String = "".to_string();
 
             while !self.eof() && condition(self.peek()?) {
-                output = format!("{}{}", output, self.next());
+                output = format!("{}{}", output, self.consume());
             }
 
             Some(output)
+        }
+
+        pub fn loc(&self) -> String {
+            format!("{}:{}", self.line, self.col)
         }
     }
 }
 
 mod tokenizer {
     use std::io::Error;
+
+    use regex::Regex;
+
+    use lazy_static::lazy_static;
 
     use crate::input_stream::{self, InputStream};
 
@@ -115,19 +123,74 @@ mod tokenizer {
             })
         }
 
-        fn read_while(&mut self, condition: impl Fn(String) -> bool) {}
-
         // read current token and move to next
-        pub fn consume(&mut self) -> Option<Token> {}
+        pub fn consume(&mut self) -> Option<Token> {
+            if self.current.is_none() && !self.stream.eof() {
+                self.advance();
+            }
+
+            let current = self.current.take();
+            self.advance();
+
+            current
+        }
 
         // read current token without consuming it
         pub fn peek(&mut self) -> Option<Token> {
-            
+            if self.current.is_none() && !self.stream.eof() {
+                self.advance();
+            }
+
+            self.current.take()
         }
 
-        // parse one token from input stream into self.current
-        fn next(&mut self) {
-            let raw: String = self.stream.next();
+        // like peek, but panic if expected is not present
+        pub fn expect(&mut self, expected: String) -> Option<Token>{
+            if self.current.is_none() && !self.stream.eof() {
+                self.advance();
+            }
+        }
+
+        // parse one token from input stream
+        // eofs silently
+        fn advance(&mut self) {
+            lazy_static! {
+                static ref RE_IS_DIGIT: Regex = Regex::new("").unwrap();
+            }
+
+            // clear whitespace
+            self.stream
+                .read_while(|s| s == "\t" || s == "\r" || s == "\n");
+
+            if self.stream.eof() {
+                self.current = None;
+                return;
+            }
+
+            let c: String = match self.stream.peek() {
+                Some(s) => s,
+                None => return,
+            };
+
+            match c.as_str() {
+                "\"" => {
+                    // string literal
+                    // eat "
+                    self.stream.consume();
+
+                    // TODO escapes
+                    let val = self.stream.read_while(|s| s != "\"");
+
+                    // eat "
+                    self.stream.consume();
+
+                    self.current = Some(Token::Str(val.expect("")));
+                },
+                x if RE_IS_DIGIT.is_match(x) || x == "-" => {
+
+                },
+                _ => panic!("Unexpected token: {} at {}", c, self.stream.loc()),
+            }
         }
     }
 }
