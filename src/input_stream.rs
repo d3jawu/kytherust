@@ -66,13 +66,13 @@ impl InputStream {
         self.pos >= self.body.len()
     }
 
-    pub fn read_while(&mut self, condition: fn(String) -> bool) -> String {
+    pub fn read_while(&mut self, condition: fn(&String) -> bool) -> String {
         let mut output: String = "".to_string();
 
         while !self.eof()
             && condition(
                 self.peek()
-                    .expect(format!("Unexpected EOF at {}", self.loc()).as_str()),
+                    .expect(format!("Unexpected EOF at {}", self.loc())),
             )
         {
             output = format!("{}{}", output, self.consume());

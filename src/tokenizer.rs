@@ -9,23 +9,69 @@ pub enum Token {
 }
 
 pub enum Keyword {
-    CONST,
-    LET,
-    IF,
-    ELSE,
-    WHILE,
-    WHEN,
-    BREAK,
-    RETURN,
-    CONTINUE,
-    TYPEOF,
+    Const,
+    Let,
+    If,
+    Else,
+    While,
+    When,
+    Break,
+    Return,
+    Typeof,
+    Continue,
+    Import,
+    Export,
+}
+
+pub enum Symbol {
+    Equal,
+    PlusEqual,
+    MinusEqual,
+    StarEqual,
+    SlashEqual,
+    PercentEqual,
+
+    Bar,
+    And,
+    BarBar,
+    AndAnd,
+
+    EqualEqual,
+    EqualEqualEqual,
+    BangEqual,
+    BangEqualEqual,
+
+    Less,
+    Greater,
+    LessEqual,
+    GreaterEqual,
+
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Percent,
+
+    Bang,
+
+    Dot,
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+    LeftBracket,
+    RightBracket,
+
+    Comma,
+    Semicolon,
+    Colon,
 }
 pub struct Tokenizer {
     current: Option<Token>,
     stream: InputStream,
 }
 
-fn is_whitespace(s: String) -> bool {
+fn is_whitespace(s: &String) -> bool {
     s == "\t" || s == "\r" || s == "\n" || s == " "
 }
 
@@ -99,20 +145,20 @@ impl Tokenizer {
 
             self.current = Some(Token::Str(val));
         } else {
-            // all non-string tokens end on whitespace
-            let tokenVal = self.stream.read_while(|s| !is_whitespace(s));
+            // all non-string tokens end on whitespace or separator
+            // TODO this is wrong
+            let tokenVal = self.stream.read_while(|s| !is_whitespace(&s) && s != "," && s != ";");
             self.current = match tokenVal.as_str() {
                 t if t.parse::<i32>().is_ok() => Some(Token::Int(tokenVal.parse::<i32>().unwrap())),
 
-                "let" => Some(Token::Kw(Keyword::LET)),
-                "if" => Some(Token::Kw(Keyword::IF)),
-                "else" => Some(Token::Kw(Keyword::ELSE)),
-                "while" => Some(Token::Kw(Keyword::WHILE)),
+                "let" => Some(Token::Kw(Keyword::Let)),
+                "if" => Some(Token::Kw(Keyword::If)),
+                "else" => Some(Token::Kw(Keyword::Else)),
+                "while" => Some(Token::Kw(Keyword::While)),
                 // TODO valid identifiers only
                 t => Some(Token::Id(tokenVal)),
                 _ => panic!("Unexpected token {} at {}", tokenVal, self.stream.loc()),
             }
         }
-
     }
 }
