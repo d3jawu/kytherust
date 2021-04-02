@@ -1,11 +1,11 @@
 use crate::input_stream::InputStream;
 
 pub enum Token {
-    Str(String),   // string literal
-    Sym(String),   // symbol
-    Int(i32),   // integer literal
-    Kw(Keyword),   // language-defined keyword
-    Id(String), // user-defined identifier
+    Str(String), // string literal
+    Sym(String), // symbol
+    Int(i32),    // integer literal
+    Kw(Keyword), // language-defined keyword
+    Id(String),  // user-defined identifier
 }
 
 pub enum Keyword {
@@ -127,12 +127,13 @@ impl Tokenizer {
             return;
         }
 
-        let c: String = match self.stream.peek() {
+        let next_char: String = match self.stream.peek() {
             Some(s) => s,
             None => return,
         };
 
-        if c.as_str() == "\"" {
+        self.current = match next_char.as_str() {
+            "\"" => {
             // string literal
             // eat "
             self.stream.consume();
@@ -143,22 +144,27 @@ impl Tokenizer {
             // eat "
             self.stream.consume();
 
-            self.current = Some(Token::Str(val));
-        } else {
-            // all non-string tokens end on whitespace or separator
-            // TODO this is wrong
-            let tokenVal = self.stream.read_while(|s| !is_whitespace(&s) && s != "," && s != ";");
-            self.current = match tokenVal.as_str() {
-                t if t.parse::<i32>().is_ok() => Some(Token::Int(tokenVal.parse::<i32>().unwrap())),
-
-                "let" => Some(Token::Kw(Keyword::Let)),
-                "if" => Some(Token::Kw(Keyword::If)),
-                "else" => Some(Token::Kw(Keyword::Else)),
-                "while" => Some(Token::Kw(Keyword::While)),
-                // TODO valid identifiers only
-                t => Some(Token::Id(tokenVal)),
-                _ => panic!("Unexpected token {} at {}", tokenVal, self.stream.loc()),
+            Some(Token::Str(val))
             }
-        }
+            t => {
+                panic!("Invalid token {} at {}.", t, self.stream.loc())
+            }
+        };
+
+            // // all non-string tokens end on whitespace or separator
+            // let tokenVal = self
+            //     .stream
+            //     .read_while(|s| !is_whitespace(&s) && s != "," && s != ";");
+            // self.current = match tokenVal.as_str() {
+            //     t if t.parse::<i32>().is_ok() => Some(Token::Int(tokenVal.parse::<i32>().unwrap())),
+
+            //     "let" => Some(Token::Kw(Keyword::Let)),
+            //     "if" => Some(Token::Kw(Keyword::If)),
+            //     "else" => Some(Token::Kw(Keyword::Else)),
+            //     "while" => Some(Token::Kw(Keyword::While)),
+            //     // TODO valid identifiers only
+            //     t => Some(Token::Id(tokenVal)),
+            //     _ => panic!("Unexpected token {} at {}", tokenVal, self.stream.loc()),
+            // }
     }
 }
