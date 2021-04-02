@@ -6,10 +6,11 @@ mod tokenizer;
 
 fn main() -> Result<(), Error> {
     let is = input_stream::InputStream::new_from_file("./main.ky")?;
-    let mut tokenizer = tokenizer::Tokenizer::new(is);
+    let mut tokenizer = tokenizer::Tokenizer::new(is).peekable();
 
-    while tokenizer.peek().is_some() {
-        let tok = tokenizer.consume();
+    for token in tokenizer {
+        token;
     }
+
     Ok(())
 }
