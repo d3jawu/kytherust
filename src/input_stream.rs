@@ -71,7 +71,8 @@ impl InputStream {
 
         while !self.eof()
             && condition(
-                &self.peek()
+                &self
+                    .peek()
                     .expect(format!("Unexpected EOF at {}", self.loc()).as_str()),
             )
         {
