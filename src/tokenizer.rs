@@ -158,7 +158,7 @@ impl Tokenizer {
                             self.stream.read_while(|s| s != "\n");
                             self.stream.consume_expect("\n");
                         }
-                        // anything else, treat it as a token and continue to token parsing
+                        // anything else, treat it as a / token and continue to token parsing
                         _ => break,
                     };
                 }
@@ -166,13 +166,29 @@ impl Tokenizer {
                 Some(c) if is_whitespace(&c) => {
                     self.stream.read_while(is_whitespace);
                 }
-                _ => break, // all non-tokens cleared
+                _ => break, // no non-tokens ahead, move on to actual parsing
             }
         }
 
         // check for EOF
         if self.stream.eof() {
             panic!("Unexpected EOF.")
+        }
+
+        macro_rules! arith_sym {
+            ($sym:expr, $sym_name:ident, $sym_equal_name:ident) => {
+                if let Some(c) = self.stream.peek() {
+                    match c.as_str() {
+                        $sym => {
+                            self.stream.consume_expect($sym);
+                            Some(Token::Sym(Symbol::$sym_name))
+                        },
+                        _ => Some(Token::Sym(Symbol::$sym_equal_name)),
+                    }
+                } else {
+                    panic!("Unexpected EOF after {}.", $sym)
+                }
+            };
         }
 
         // at this point, there is definitely a token ahead
@@ -187,13 +203,12 @@ impl Tokenizer {
 
                 Some(Token::Str(val))
             }
-            "/" => {
-                match self.stream.peek().expect("Unexpected EOF after /").as_str() {
-                    "=" => Some(Token::Sym(Symbol::SlashEqual)),
-                    // anything else, treat it as division symbol
-                    _ => Some(Token::Sym(Symbol::Slash)),
-                }
-            }
+            // symbols
+            "+" => arith_sym!("+", Plus, PlusEqual),
+            "-" => arith_sym!("-", Minus, MinusEqual),
+            "*" => arith_sym!("*", Star, StarEqual),
+            "/" => arith_sym!("/", Slash, SlashEqual),
+            "%" => arith_sym!("%", Percent, PercentEqual),
             t => {
                 // TODO error with whole word?
                 panic!("Unexpected character {} at {}.", t, self.stream.loc())
