@@ -179,11 +179,11 @@ impl Tokenizer {
             ($sym:expr, $sym_name:ident, $sym_equal_name:ident) => {
                 if let Some(c) = self.stream.peek() {
                     match c.as_str() {
-                        $sym => {
-                            self.stream.consume_expect($sym);
-                            Some(Token::Sym(Symbol::$sym_name))
+                        "=" => {
+                            self.stream.consume_expect("=");
+                            Some(Token::Sym(Symbol::$sym_equal_name))
                         },
-                        _ => Some(Token::Sym(Symbol::$sym_equal_name)),
+                        _ => Some(Token::Sym(Symbol::$sym_name)),
                     }
                 } else {
                     panic!("Unexpected EOF after {}.", $sym)
