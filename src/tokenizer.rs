@@ -40,10 +40,9 @@ pub enum Symbol {
     AndAnd,
 
     EqualEqual,
-    EqualEqualEqual,
+    // EqualEqualEqual,
     BangEqual,
-    BangEqualEqual,
-
+    // BangEqualEqual,
     Less,
     Greater,
     LessEqual,
@@ -76,6 +75,11 @@ pub struct Tokenizer {
 
 fn is_whitespace(s: &String) -> bool {
     s == "\t" || s == "\r" || s == "\n" || s == " "
+}
+
+// is this faster than a regex checking for a digit?
+fn is_number(s: &str) -> bool {
+    ["0", "1", "2", "3", "4", "5" ].contains(&s)
 }
 
 impl Tokenizer {
@@ -175,18 +179,24 @@ impl Tokenizer {
             panic!("Unexpected EOF.")
         }
 
-        macro_rules! arith_sym {
-            ($sym:expr, $sym_name:ident, $sym_equal_name:ident) => {
+        macro_rules! some_sym_tok {
+            ($sym:ident) => {
+                Some(Token::Sym(Symbol::$sym))
+            };
+        }
+
+        macro_rules! sym_or_sym_and {
+            ($and:expr, $sym_name:ident, $sym_and_name:ident) => {
                 if let Some(c) = self.stream.peek() {
                     match c.as_str() {
-                        "=" => {
-                            self.stream.consume_expect("=");
-                            Some(Token::Sym(Symbol::$sym_equal_name))
-                        },
-                        _ => Some(Token::Sym(Symbol::$sym_name)),
+                        $and => {
+                            self.stream.consume_expect($and);
+                            some_sym_tok!($sym_and_name)
+                        }
+                        _ => some_sym_tok!($sym_name), // if anything else, treat it as just sym
                     }
                 } else {
-                    panic!("Unexpected EOF after {}.", $sym)
+                    panic!("Unexpected EOF.")
                 }
             };
         }
@@ -203,12 +213,38 @@ impl Tokenizer {
 
                 Some(Token::Str(val))
             }
+            // number
+            t if is_number(t) || t == "-" => {
+                // TODO
+                None
+            }
             // symbols
-            "+" => arith_sym!("+", Plus, PlusEqual),
-            "-" => arith_sym!("-", Minus, MinusEqual),
-            "*" => arith_sym!("*", Star, StarEqual),
-            "/" => arith_sym!("/", Slash, SlashEqual),
-            "%" => arith_sym!("%", Percent, PercentEqual),
+            "+" => sym_or_sym_and!("=", Plus, PlusEqual),
+            // minus is handled with number
+            "*" => sym_or_sym_and!("=", Star, StarEqual),
+            "/" => sym_or_sym_and!("=", Slash, SlashEqual),
+            "%" => sym_or_sym_and!("=", Percent, PercentEqual),
+
+            "|" => sym_or_sym_and!("|", Bar, BarBar),
+            "&" => sym_or_sym_and!("&", And, AndAnd),
+
+            "=" => sym_or_sym_and!("=", Equal, EqualEqual),
+            "!" => sym_or_sym_and!("=", Bang, BangEqual),
+
+            "<" => sym_or_sym_and!("=", Less, LessEqual),
+            ">" => sym_or_sym_and!("=", Greater, GreaterEqual),
+
+            "." => some_sym_tok!(Dot),
+            "(" => some_sym_tok!(LeftParen),
+            ")" => some_sym_tok!(RightParen),
+            "{" => some_sym_tok!(LeftBrace),
+            "}" => some_sym_tok!(RightBrace),
+            "[" => some_sym_tok!(LeftBracket),
+            "]" => some_sym_tok!(RightBracket),
+
+            "," => some_sym_tok!(Comma),
+            ";" => some_sym_tok!(Semicolon),
+            ":" => some_sym_tok!(Colon),
             t => {
                 // TODO error with whole word?
                 panic!("Unexpected character {} at {}.", t, self.stream.loc())
