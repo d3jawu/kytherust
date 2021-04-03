@@ -2,7 +2,6 @@ use crate::input_stream::InputStream;
 
 #[derive(Debug, PartialEq)]
 pub enum Token {
-    Comment,
     Str(String), // string literal
     Sym(Symbol), // symbol
     Int(i32),    // integer literal
@@ -129,22 +128,57 @@ impl Tokenizer {
     */
 
     // parse one token from input stream
-    // eofs silently
     fn advance(&mut self) {
-        // clear whitespace
-        self.stream.read_while(is_whitespace);
+        // clear non-tokens (whitespace and comments)
+        loop {
+            match self.stream.peek() {
+                // possibly a comment
+                Some(c) if c == "/" => {
+                    match self.stream.peek_next().unwrap_or("".to_string()).as_str() {
+                        // multi-line comment
+                        "*" => loop {
+                            if let (Some(n), Some(m)) =
+                                (self.stream.peek(), self.stream.peek_next())
+                            {
+                                if n == "*" && m == "/" {
+                                    self.stream.consume_expect("*");
+                                    self.stream.consume_expect("/");
+                                    break;
+                                }
+                            }
 
-        if self.stream.eof() {
-            self.current = None;
-            return;
+                            if self.stream.eof() {
+                                panic!("Unexpected EOF.")
+                            }
+
+                            self.stream.consume();
+                        },
+                        // single-line comment
+                        "/" => {
+                            self.stream.read_while(|s| s != "\n");
+                            self.stream.consume_expect("\n");
+                        }
+                        // anything else, treat it as a token and continue to token parsing
+                        _ => break,
+                    };
+                }
+                // whitespace
+                Some(c) if is_whitespace(&c) => {
+                    self.stream.read_while(is_whitespace);
+                }
+                _ => break, // all non-tokens cleared
+            }
         }
 
-        self.current = match self.stream.peek().unwrap_or("none".to_string()).as_str() {
+        // check for EOF
+        if self.stream.eof() {
+            panic!("Unexpected EOF.")
+        }
+
+        // at this point, there is definitely a token ahead
+        self.current = match self.stream.consume().as_str() {
             // string literal
             "\"" => {
-                // eat "
-                self.stream.consume_expect("\"");
-
                 // TODO escaped
                 let val = self.stream.read_while(|s| s != "\"");
 
@@ -154,38 +188,10 @@ impl Tokenizer {
                 Some(Token::Str(val))
             }
             "/" => {
-                // eat /
-                self.stream.consume_expect("/");
-
                 match self.stream.peek().expect("Unexpected EOF after /").as_str() {
-                    // multi-line comment
-                    "*" => {
-                        loop {
-                            if let (Some(n), Some(m)) = (self.stream.peek(), self.stream.peek_next()) {
-                                if n == "*" && m == "/" {
-                                    self.stream.consume_expect("*");
-                                    self.stream.consume_expect("/");
-                                    break Some(Token::Comment)
-                                }
-                            }
-
-                            if self.stream.eof() {
-                                panic!("Unexpected EOF.")
-                            }
-                           
-                            self.stream.consume();
-                        }
-                    }
-                    // single-line comment
-                    "/" => {
-                        self.stream.read_while(|s| s != "\n");
-                        Some(Token::Comment)
-                    }
                     "=" => Some(Token::Sym(Symbol::SlashEqual)),
                     // anything else, treat it as division symbol
-                    _ => {
-                        Some(Token::Sym(Symbol::Slash))
-                    }
+                    _ => Some(Token::Sym(Symbol::Slash)),
                 }
             }
             t => {

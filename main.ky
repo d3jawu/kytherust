@@ -1,3 +1,6 @@
+/* a multi-
+line
+comment */
 // tests for number operations
 let intVal = 1;
 let fpVal = 1.01;
