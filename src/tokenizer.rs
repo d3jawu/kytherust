@@ -2,6 +2,7 @@ use crate::input_stream::InputStream;
 
 #[derive(Debug, PartialEq)]
 pub enum Token {
+    Comment,
     Str(String), // string literal
     Sym(String), // symbol
     Int(i32),    // integer literal
@@ -105,7 +106,6 @@ impl Tokenizer {
     }
 
     // like peek, but panic if expected is not present
-    /*
     pub fn expect(&self, expected: &Option<Token>) -> &Option<Token> {
         let t = self.peek();
 
@@ -120,7 +120,6 @@ impl Tokenizer {
 
         t
     }
-    */
 
     // like consume, but panic if expected is not present
     /*
@@ -146,7 +145,7 @@ impl Tokenizer {
                 // eat "
                 self.stream.consume();
 
-                // TODO escaped strings
+                // TODO escaped
                 let val = self.stream.read_while(|s| s != "\"");
 
                 // eat "
@@ -154,19 +153,34 @@ impl Tokenizer {
 
                 Some(Token::Str(val))
             }
-            // comment
             "/" => {
                 // eat /
                 self.stream.consume();
 
                 match self.stream.peek().unwrap_or("".to_string()).as_str() {
+                    // multi-line comment
+                    "*" => {
+                        self.stream.consume();
+
+                        None
+                    }
+                    // single-line comment
+                    "/" => {
+                        self.stream.read_while(|s| s != "\n");
+                        Some(Token::Comment)
+                    }
+                    t if is_whitespace(&t.to_string()) => {
+                        // Some()
+                        None
+                    }
                     t => {
-                        panic!("Invalid token {} at {}.", t, self.stream.loc())
+                        panic!("Unexpected token /{} at {}.", t, self.stream.loc())
                     }
                 }
             }
             t => {
-                panic!("Invalid token {} at {}.", t, self.stream.loc())
+                // TODO error with whole word?
+                panic!("Unexpected character {} at {}.", t, self.stream.loc())
             }
         };
 
