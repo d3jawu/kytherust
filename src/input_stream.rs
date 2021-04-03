@@ -46,12 +46,35 @@ impl InputStream {
         next
     }
 
+    // like consume, but panics if expected doesn't match
+    pub fn consume_expect(&mut self, expected: &str) -> String {
+        let next = self.consume();
+
+        if next != expected.to_string() {
+            panic!("Expected {} but got {} at {}", expected, next, self.loc());
+        }
+
+        next
+    }
+
     pub fn peek(&self) -> Option<String> {
         if self.eof() {
             None
         } else {
             Some(self.body[self.pos].clone())
         }
+    }
+
+    // like peek, but panics if expected doesn't match
+    // panics on EOF, to check for EOF use eof()
+    pub fn peek_expect(&self, expected: &str) -> Option<String> {
+        let next = self.peek().expect(format!("Expected {} but got EOF at {}", expected, self.loc()).as_str());
+
+        if next != expected {
+            panic!("Expected {} but got {} at {}", expected, next, self.loc());
+        }
+
+        Some(next)
     }
 
     pub fn peek_next(&self) -> Option<String> {

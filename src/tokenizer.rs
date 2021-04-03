@@ -4,7 +4,7 @@ use crate::input_stream::InputStream;
 pub enum Token {
     Comment,
     Str(String), // string literal
-    Sym(String), // symbol
+    Sym(Symbol), // symbol
     Int(i32),    // integer literal
     Kw(Keyword), // language-defined keyword
     Id(String),  // user-defined identifier
@@ -143,38 +143,48 @@ impl Tokenizer {
             // string literal
             "\"" => {
                 // eat "
-                self.stream.consume();
+                self.stream.consume_expect("\"");
 
                 // TODO escaped
                 let val = self.stream.read_while(|s| s != "\"");
 
                 // eat "
-                self.stream.consume();
+                self.stream.consume_expect("\"");
 
                 Some(Token::Str(val))
             }
             "/" => {
                 // eat /
-                self.stream.consume();
+                self.stream.consume_expect("/");
 
-                match self.stream.peek().unwrap_or("".to_string()).as_str() {
+                match self.stream.peek().expect("Unexpected EOF after /").as_str() {
                     // multi-line comment
                     "*" => {
-                        self.stream.consume();
+                        loop {
+                            if let (Some(n), Some(m)) = (self.stream.peek(), self.stream.peek_next()) {
+                                if n == "*" && m == "/" {
+                                    self.stream.consume_expect("*");
+                                    self.stream.consume_expect("/");
+                                    break Some(Token::Comment)
+                                }
+                            }
 
-                        None
+                            if self.stream.eof() {
+                                panic!("Unexpected EOF.")
+                            }
+                           
+                            self.stream.consume();
+                        }
                     }
                     // single-line comment
                     "/" => {
                         self.stream.read_while(|s| s != "\n");
                         Some(Token::Comment)
                     }
-                    t if is_whitespace(&t.to_string()) => {
-                        // Some()
-                        None
-                    }
-                    t => {
-                        panic!("Unexpected token /{} at {}.", t, self.stream.loc())
+                    "=" => Some(Token::Sym(Symbol::SlashEqual)),
+                    // anything else, treat it as division symbol
+                    _ => {
+                        Some(Token::Sym(Symbol::Slash))
                     }
                 }
             }
