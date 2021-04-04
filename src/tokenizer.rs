@@ -5,6 +5,7 @@ pub enum Token {
     Str(String), // string literal
     Sym(Symbol), // symbol
     Int(i32),    // integer literal
+    Double(f64), // FP literal
     Kw(Keyword), // language-defined keyword
     Id(String),  // user-defined identifier
 }
@@ -77,9 +78,9 @@ fn is_whitespace(s: &String) -> bool {
     s == "\t" || s == "\r" || s == "\n" || s == " "
 }
 
-// is this faster than a regex checking for a digit?
-fn is_number(s: &str) -> bool {
-    ["0", "1", "2", "3", "4", "5" ].contains(&s)
+// faster than a regex
+fn is_digit(s: &str) -> bool {
+    ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"].contains(&s)
 }
 
 impl Tokenizer {
@@ -213,14 +214,9 @@ impl Tokenizer {
 
                 Some(Token::Str(val))
             }
-            // number
-            t if is_number(t) || t == "-" => {
-                // TODO
-                None
-            }
             // symbols
             "+" => sym_or_sym_and!("=", Plus, PlusEqual),
-            // minus is handled with number
+            "-" => sym_or_sym_and!("=", Minus, MinusEqual),
             "*" => sym_or_sym_and!("=", Star, StarEqual),
             "/" => sym_or_sym_and!("=", Slash, SlashEqual),
             "%" => sym_or_sym_and!("=", Percent, PercentEqual),
@@ -245,26 +241,44 @@ impl Tokenizer {
             "," => some_sym_tok!(Comma),
             ";" => some_sym_tok!(Semicolon),
             ":" => some_sym_tok!(Colon),
+            t if is_digit(t) => {
+                let mut output: Vec<String> = vec![t.to_string()];
+                let mut has_dec = false;
+
+                while let Some(s) = self.stream.peek() {
+                    if is_digit(&s) || s == "." {
+                        if s == "." {
+                            if has_dec {
+                                panic!("Unexpected '.' at {}", self.stream.loc())
+                            }
+
+                            has_dec = true;
+                        }
+
+                        self.stream.consume_expect(&s);
+                        output.push(s);
+                    } else {
+                        break;
+                    }
+                }
+
+                let result = output.join("");
+
+                if has_dec {
+                    Some(Token::Double(result.parse::<f64>().unwrap_or_else(|_| {
+                        panic!("Could not parse number: {}", result)
+                    })))
+                } else {
+                    Some(Token::Int(result.parse::<i32>().unwrap_or_else(|_| {
+                        panic!("Could not parse integer: {}", result)
+                    })))
+                }
+            }
             t => {
-                // TODO error with whole word?
+                // read as whole word
+
                 panic!("Unexpected character {} at {}.", t, self.stream.loc())
             }
         };
-
-        // // all non-string tokens end on whitespace or separator
-        // let tokenVal = self
-        //     .stream
-        //     .read_while(|s| !is_whitespace(&s) && s != "," && s != ";");
-        // self.current = match tokenVal.as_str() {
-        //     t if t.parse::<i32>().is_ok() => Some(Token::Int(tokenVal.parse::<i32>().unwrap())),
-
-        //     "let" => Some(Token::Kw(Keyword::Let)),
-        //     "if" => Some(Token::Kw(Keyword::If)),
-        //     "else" => Some(Token::Kw(Keyword::Else)),
-        //     "while" => Some(Token::Kw(Keyword::While)),
-        //     // TODO valid identifiers only
-        //     t => Some(Token::Id(tokenVal)),
-        //     _ => panic!("Unexpected token {} at {}", tokenVal, self.stream.loc()),
-        // }
     }
 }

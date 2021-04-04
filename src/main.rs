@@ -8,7 +8,7 @@ fn main() -> Result<(), Error> {
     let mut tokenizer = tokenizer::Tokenizer::new(is);
 
     while tokenizer.peek().is_some() {
-        let tok = tokenizer.consume();
+        tokenizer.consume();
     }
     Ok(())
 }

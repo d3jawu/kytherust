@@ -21,8 +21,9 @@ impl InputStream {
         })
     }
 
-    // used for testing, takes a vector of segmented unicode graphemes
-    pub fn new_from_vec(body: Vec<String>) -> InputStream {
+    // used for testing, takes a string
+    pub fn new_from_string(contents: String) -> InputStream {
+        let body: Vec<String> = contents.graphemes(true).map(|s| s.to_string()).collect();
         InputStream {
             body,
             pos: 0,
@@ -91,8 +92,8 @@ impl InputStream {
         self.pos >= self.body.len()
     }
 
-    pub fn read_while(&mut self, condition: fn(&String) -> bool) -> String {
-        let mut output: String = "".to_string();
+    pub fn read_while(&mut self, condition: impl Fn(&String) -> bool) -> String {
+        let mut output: Vec<String> = Vec::new();
 
         while !self.eof()
             && condition(
@@ -101,10 +102,10 @@ impl InputStream {
                     .expect(format!("Unexpected EOF at {}", self.loc()).as_str()),
             )
         {
-            output = format!("{}{}", output, self.consume());
+            output.push(self.consume());
         }
 
-        output
+        output.join("")
     }
 
     pub fn loc(&self) -> String {
