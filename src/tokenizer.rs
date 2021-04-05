@@ -20,8 +20,8 @@ pub enum Keyword {
     When,
     Break,
     Return,
-    Typeof,
     Continue,
+    Typeof,
     Import,
     Export,
 }
@@ -74,13 +74,22 @@ pub struct Tokenizer {
     stream: InputStream,
 }
 
-fn is_whitespace(s: &String) -> bool {
-    s == "\t" || s == "\r" || s == "\n" || s == " "
+macro_rules! as_char {
+    ($s:expr) => {
+        $s.chars().next().unwrap_or('\0')
+    };
 }
 
-// faster than a regex
-fn is_digit(s: &str) -> bool {
-    ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"].contains(&s)
+macro_rules! some_sym_tok {
+    ($sym:ident) => {
+        Some(Token::Sym(Symbol::$sym))
+    };
+}
+
+macro_rules! some_kw_tok {
+    ($kw:ident) => {
+        Some(Token::Kw(Keyword::$kw))
+    };
 }
 
 impl Tokenizer {
@@ -168,8 +177,8 @@ impl Tokenizer {
                     };
                 }
                 // whitespace
-                Some(c) if is_whitespace(&c) => {
-                    self.stream.read_while(is_whitespace);
+                Some(c) if as_char!(c).is_whitespace() => {
+                    self.stream.read_while(|s| as_char!(s).is_whitespace());
                 }
                 _ => break, // no non-tokens ahead, move on to actual parsing
             }
@@ -177,13 +186,8 @@ impl Tokenizer {
 
         // check for EOF
         if self.stream.eof() {
-            panic!("Unexpected EOF.")
-        }
-
-        macro_rules! some_sym_tok {
-            ($sym:ident) => {
-                Some(Token::Sym(Symbol::$sym))
-            };
+            self.current = None;
+            return;
         }
 
         macro_rules! sym_or_sym_and {
@@ -241,12 +245,12 @@ impl Tokenizer {
             "," => some_sym_tok!(Comma),
             ";" => some_sym_tok!(Semicolon),
             ":" => some_sym_tok!(Colon),
-            t if is_digit(t) => {
+            t if as_char!(t).is_digit(10) => {
                 let mut output: Vec<String> = vec![t.to_string()];
                 let mut has_dec = false;
 
                 while let Some(s) = self.stream.peek() {
-                    if is_digit(&s) || s == "." {
+                    if as_char!(t).is_digit(10) || s == "." {
                         if s == "." {
                             if has_dec {
                                 panic!("Unexpected '.' at {}", self.stream.loc())
@@ -276,8 +280,39 @@ impl Tokenizer {
             }
             t => {
                 // read as whole word
+                let word = {
+                    let mut word: Vec<String> = vec![t.to_string()];
 
-                panic!("Unexpected character {} at {}.", t, self.stream.loc())
+                    while let Some(s) = self.stream.peek() {
+                        if !as_char!(s).is_alphanumeric() && s != "_" {
+                            break;
+                        }
+
+                        self.stream.consume_expect(&s);
+                        word.push(s);
+                    }
+
+                    word.join("")
+                };
+
+                match word.as_str() {
+                    "const" => some_kw_tok!(Const),
+                    "let" => some_kw_tok!(Let),
+                    "if" => some_kw_tok!(If),
+                    "else" => some_kw_tok!(Else),
+                    "while" => some_kw_tok!(While),
+                    "when" => some_kw_tok!(When),
+                    "break" => some_kw_tok!(Break),
+                    "return" => some_kw_tok!(Return),
+                    "continue" => some_kw_tok!(Continue),
+                    "typeof" => some_kw_tok!(Typeof),
+                    "import" => some_kw_tok!(Import),
+                    "export" => some_kw_tok!(Export),
+                    // user-identified keyword
+                    id => {
+                        Some(Token::Id(id.to_string()))
+                    }
+                }
             }
         };
     }

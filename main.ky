@@ -1,7 +1,29 @@
+= += -= *= /= %=
+| & || &&
+== != < > <= >=
++ - * / %
+!
+. ( ) [ ] { }
+, ; :
+
+const
+let
+if
+else
+while
+when
+break
+return
+continue
+typeof
+import
+export
+
 /* a multi-
 line
 comment */
 // tests for number operations
+/*
 let intVal = 1;
 let fpVal = 1.01;
 
@@ -22,3 +44,4 @@ let compound2 = 1 + 2 - 3 * 4 / 5 % 6;
 // type
 let numType1 = typeof intVal;
 let numType2 = typeof fpVal;
+*/
