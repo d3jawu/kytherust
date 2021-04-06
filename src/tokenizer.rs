@@ -250,7 +250,7 @@ impl Tokenizer {
                 let mut has_dec = false;
 
                 while let Some(s) = self.stream.peek() {
-                    if as_char!(t).is_digit(10) || s == "." {
+                    if as_char!(s).is_digit(10) || s == "." {
                         if s == "." {
                             if has_dec {
                                 panic!("Unexpected '.' at {}", self.stream.loc())
@@ -309,11 +309,109 @@ impl Tokenizer {
                     "import" => some_kw_tok!(Import),
                     "export" => some_kw_tok!(Export),
                     // user-identified keyword
-                    id => {
-                        Some(Token::Id(id.to_string()))
-                    }
+                    id => Some(Token::Id(id.to_string())),
                 }
             }
         };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::input_stream;
+    use std::io::Error;
+
+    #[test]
+    fn tokens() -> Result<(), String> {
+        let input = "\"string literal\"
+= += -= *= /= %=
+| & || &&
+== != < > <= >=
++ - * / %
+!
+. ( ) [ ] { }
+, ; :
+
+42
+3.14159
+
+const
+let
+if
+else
+while
+when
+break
+return
+continue
+typeof
+import
+export
+
+myVar";
+
+        let mut tokenizer = Tokenizer::new(input_stream::InputStream::new_from_string(input));
+
+        let expected = vec![
+            Some(Token::Str("string literal".to_string())),
+            some_sym_tok!(Equal),
+            some_sym_tok!(PlusEqual),
+            some_sym_tok!(MinusEqual),
+            some_sym_tok!(StarEqual),
+            some_sym_tok!(SlashEqual),
+            some_sym_tok!(PercentEqual),
+            some_sym_tok!(Bar),
+            some_sym_tok!(And),
+            some_sym_tok!(BarBar),
+            some_sym_tok!(AndAnd),
+            some_sym_tok!(EqualEqual),
+            some_sym_tok!(BangEqual),
+            some_sym_tok!(Less),
+            some_sym_tok!(Greater),
+            some_sym_tok!(LessEqual),
+            some_sym_tok!(GreaterEqual),
+            some_sym_tok!(Plus),
+            some_sym_tok!(Minus),
+            some_sym_tok!(Star),
+            some_sym_tok!(Slash),
+            some_sym_tok!(Percent),
+            some_sym_tok!(Bang),
+            some_sym_tok!(Dot),
+            some_sym_tok!(LeftParen),
+            some_sym_tok!(RightParen),
+            some_sym_tok!(LeftBracket),
+            some_sym_tok!(RightBracket),
+            some_sym_tok!(LeftBrace),
+            some_sym_tok!(RightBrace),
+            some_sym_tok!(Comma),
+            some_sym_tok!(Semicolon),
+            some_sym_tok!(Colon),
+            Some(Token::Int(42)),
+            Some(Token::Double(3.14159)),
+            some_kw_tok!(Const),
+            some_kw_tok!(Let),
+            some_kw_tok!(If),
+            some_kw_tok!(Else),
+            some_kw_tok!(While),
+            some_kw_tok!(When),
+            some_kw_tok!(Break),
+            some_kw_tok!(Return),
+            some_kw_tok!(Continue),
+            some_kw_tok!(Typeof),
+            some_kw_tok!(Import),
+            some_kw_tok!(Export),
+            Some(Token::Id("myVar".to_string()))
+        ];
+        let mut expected_iter = expected.iter();
+
+        // assert_eq!(tokenizer.consume(), Some(Token::Str("string literal".to_string())));
+
+        while let (got, Some(expected)) = (tokenizer.consume(), expected_iter.next()) {
+            println!("{:?} vs {:?}", got, expected);
+            assert_eq!(&got, expected);
+        }
+
+        Ok(())
     }
 }

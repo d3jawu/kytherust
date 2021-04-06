@@ -22,8 +22,8 @@ impl InputStream {
     }
 
     // used for testing, takes a string
-    pub fn new_from_string(contents: String) -> InputStream {
-        let body: Vec<String> = contents.graphemes(true).map(|s| s.to_string()).collect();
+    pub fn new_from_string(contents: &str) -> InputStream {
+        let body: Vec<String> = contents.to_string().graphemes(true).map(|s| s.to_string()).collect();
         InputStream {
             body,
             pos: 0,
