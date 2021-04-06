@@ -2,6 +2,7 @@ use std::io::Error;
 
 mod input_stream;
 mod tokenizer;
+mod parser;
 
 fn main() -> Result<(), Error> {
     let is = input_stream::InputStream::new_from_file("./main.ky")?;

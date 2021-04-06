@@ -105,6 +105,10 @@ impl Tokenizer {
         tok
     }
 
+    pub fn loc(&self) -> String {
+        self.stream.loc()
+    }
+
     // read current token without consuming it
     pub fn peek(&self) -> &Option<Token> {
         &self.current
@@ -119,10 +123,10 @@ impl Tokenizer {
     }
 
     // like peek, but panic if expected is not present
-    pub fn expect(&self, expected: &Option<Token>) -> &Option<Token> {
+    pub fn expect(&self, expected: &Token) -> &Option<Token> {
         let t = self.peek();
 
-        if t == expected {
+        if t.as_ref() != Some(expected) {
             panic!(
                 "Expected {:?} but got {:?} at {}.",
                 expected,
@@ -135,11 +139,10 @@ impl Tokenizer {
     }
 
     // like consume, but panic if expected is not present
-    /*
-    pub fn consume_expect(&mut self, expected: Token) -> Option<Token> {
-
+    pub fn consume_expect(&mut self, expected: &Token) -> Option<Token> {
+        self.expect(expected);
+        self.consume()
     }
-    */
 
     // parse one token from input stream
     fn advance(&mut self) {
