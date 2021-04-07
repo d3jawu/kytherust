@@ -6,10 +6,10 @@ mod parser;
 
 fn main() -> Result<(), Error> {
     let is = input_stream::InputStream::new_from_file("./main.ky")?;
-    let mut tokenizer = tokenizer::Tokenizer::new(is);
+    let tokenizer = tokenizer::Tokenizer::new(is);
+    let mut parser = parser::Parser::new(tokenizer);
 
-    while tokenizer.peek().is_some() {
-        tokenizer.consume();
-    }
+    parser.parse();
+    
     Ok(())
 }
