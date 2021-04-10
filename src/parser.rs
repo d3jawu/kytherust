@@ -117,17 +117,11 @@ impl Parser {
             return exp;
         }
 
-
         let mut composed: AstNode = exp;
 
         loop {
             let next = self.tok.peek();
-
             let mut finished = true;
-
-            if next.is_none() {
-                panic!()
-            }
 
             match next {
                 Some(t) => {
@@ -147,9 +141,7 @@ impl Parser {
                         t if t == &Token::Sym(LeftBracket) => {
                             panic!("Bracket access not yet implemented.")
                         }
-                        t => {
-                            panic!("Unexpected token {:?} at {}.", t, self.tok.loc())
-                        }
+                        _ => {}
                     }
                 }
                 None => {
@@ -162,8 +154,7 @@ impl Parser {
             }
         }
 
-
-        panic!()
+        composed
     }
 
     fn parse_exp_atom(&mut self) -> AstNode {
@@ -186,12 +177,13 @@ impl Parser {
                     }
                 }
                 &Token::Kw(Typeof) => {
+                    self.tok.consume_expect(&Token::Kw(Typeof));
                     AstNode::Typeof {
                         operand: Box::from(self.parse_exp_atom())
                     }
                 }
                 &Token::Kw(If) => {
-                    panic!("If is not yet implemented.")
+                    panic!("'if' is not yet implemented.")
                 }
                 &Token::Kw(kw) if kw == Const || kw == Let => {
                     self.tok.consume();
@@ -205,6 +197,10 @@ impl Parser {
                     } else {
                         panic!("Expecting identifier but got {:?} at {}", self.tok.peek(), self.tok.loc())
                     }
+                }
+                &Token::Int(n) => {
+                    self.tok.consume_expect(&Token::Int(n));
+                    AstNode::Literal(Literal::Int(n))
                 }
                 t => {
                     panic!("Unexpected token: {:?} at {}", t, self.tok.loc())

@@ -16,8 +16,8 @@ impl InputStream {
         Ok(InputStream {
             body,
             pos: 0,
-            line: 0,
-            col: 0,
+            line: 1,
+            col: 1,
         })
     }
 
@@ -27,8 +27,8 @@ impl InputStream {
         InputStream {
             body,
             pos: 0,
-            line: 0,
-            col: 0,
+            line: 1,
+            col: 1,
         }
     }
 
@@ -39,7 +39,7 @@ impl InputStream {
 
         if next == "\n" {
             self.line += 1;
-            self.col = 0;
+            self.col = 1;
         } else {
             self.col += 1;
         }

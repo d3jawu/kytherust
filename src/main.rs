@@ -9,7 +9,11 @@ fn main() -> Result<(), Error> {
     let tokenizer = tokenizer::Tokenizer::new(is);
     let mut parser = parser::Parser::new(tokenizer);
 
-    parser.parse();
+    let program = parser.parse();
+
+    for node in program {
+        println!("{:#?}", node);
+    }
     
     Ok(())
 }
