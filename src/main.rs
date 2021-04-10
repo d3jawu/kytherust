@@ -14,6 +14,6 @@ fn main() -> Result<(), Error> {
     for node in program {
         println!("{:#?}", node);
     }
-    
+
     Ok(())
 }

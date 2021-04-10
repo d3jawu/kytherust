@@ -121,27 +121,26 @@ impl Parser {
 
         loop {
             let next = self.tok.peek();
-            let mut finished = true;
+            let mut finished = false;
 
             match next {
                 Some(t) => {
                     match t {
+                        t if t == &Token::Sym(LeftParen) => {
+                            composed = self.make_call(composed);
+                        }
                         t if is_binary(t) => {
                             composed = self.make_binary(composed);
-                            finished = false;
                         }
                         t if t == &Token::Sym(Dot) => {
                             composed = self.make_dot_access(composed);
-                            finished = false;
-                        }
-                        t if t == &Token::Sym(LeftParen) => {
-                            composed = self.make_call(composed);
-                            finished = false;
                         }
                         t if t == &Token::Sym(LeftBracket) => {
-                            panic!("Bracket access not yet implemented.")
+                            composed = self.make_bracket_access(composed);
                         }
-                        _ => {}
+                        _ => {
+                            finished = true;
+                        }
                     }
                 }
                 None => {
@@ -193,7 +192,7 @@ impl Parser {
                             op: kw,
                             id,
                             value: Box::from(self.parse_exp_atom()),
-                        }
+                        };
                     } else {
                         panic!("Expecting identifier but got {:?} at {}", self.tok.peek(), self.tok.loc())
                     }
@@ -201,6 +200,10 @@ impl Parser {
                 &Token::Int(n) => {
                     self.tok.consume_expect(&Token::Int(n));
                     AstNode::Literal(Literal::Int(n))
+                }
+                &Token::Double(d) => {
+                    self.tok.consume_expect(&Token::Double(d));
+                    AstNode::Literal(Literal::Double(d))
                 }
                 t => {
                     panic!("Unexpected token: {:?} at {}", t, self.tok.loc())
@@ -220,6 +223,10 @@ impl Parser {
     }
 
     fn make_dot_access(&mut self, target: AstNode) -> AstNode {
+        panic!()
+    }
+
+    fn make_bracket_access(&mut self, target: AstNode) -> AstNode {
         panic!()
     }
 }
