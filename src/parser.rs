@@ -95,7 +95,7 @@ impl Parser {
     pub fn parse(&mut self) -> Vec<AstNode> {
         let mut program: Vec<AstNode> = Vec::new();
         while self.tok.peek().is_some() {
-            program.push(self.parse_exp());
+            program.push(self.parse_exp(true));
 
             self.tok.consume_expect(&Token::Sym(Symbol::Semicolon));
         }
@@ -103,21 +103,59 @@ impl Parser {
         program
     }
 
-    fn parse_exp(&mut self) -> AstNode {
+    // assemble composite expressions, e.g. binary exps, function calls, etc
+    fn parse_exp(&mut self, compose: bool) -> AstNode {
         let exp = self.parse_exp_atom();
 
-        if let Some(token) = self.tok.peek() {
-            match token {
-                // binary op
-                t if is_binary(t) => {}
+        if !compose {
+            return exp
+        }
 
-                t => {
-                    panic!("Unexpected token: {:?} at {}", t, self.tok.loc())
+
+        let mut composed: AstNode = exp;
+
+        loop {
+            let next = self.tok.peek();
+
+            let mut finished = true;
+
+            if next.is_none() {
+                panic!()
+            }
+
+            match next {
+                Some(t) => {
+                    match t {
+                        t if is_binary(t) => {
+                            composed = self.make_binary(composed);
+                            finished = false;
+                        },
+                        t if t == &Token::Sym(Symbol::Dot) => {
+                            composed = self.make_dot_access(composed);
+                            finished = false;
+                        },
+                        t if t == &Token::Sym(Symbol::LeftParen) => {
+                            composed = self.make_call(composed);
+                            finished = false;
+                        },
+                        t if t == &Token::Sym(Symbol::LeftBracket) => {
+                            panic!("Bracket access not yet implemented.")
+                        }
+                        t => {
+                            panic!("Unexpected token {:?} at {}.", t, self.tok.loc())
+                        }
+                    }
+                }
+                None => {
+                    panic!("Unexpected EOF.")
                 }
             }
-        } else {
-            panic!("Unexpected EOF.")
+
+            if finished {
+                break;
+            }
         }
+
 
         panic!()
     }
@@ -127,7 +165,7 @@ impl Parser {
             match token {
                 &Token::Sym(Symbol::LeftParen) => {
                     self.tok.consume_expect(&Token::Sym(Symbol::LeftParen));
-                    let node = self.parse_exp();
+                    let node = self.parse_exp(true);
                     self.tok.consume_expect(&Token::Sym(Symbol::LeftParen));
                     return node;
                 }
@@ -138,5 +176,17 @@ impl Parser {
         } else {
             panic!("Unexpected EOF.")
         }
+    }
+
+    fn make_binary(&mut self, lhs: AstNode) -> AstNode {
+        panic!()
+    }
+
+    fn make_call(&mut self, target: AstNode) -> AstNode {
+        panic!()
+    }
+
+    fn make_dot_access(&mut self, target: AstNode) -> AstNode {
+        panic!()
     }
 }
