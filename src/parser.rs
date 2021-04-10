@@ -1,10 +1,14 @@
 use crate::tokenizer::*;
+use crate::tokenizer::Symbol::*;
+use crate::tokenizer::Keyword::*;
+use crate::parser::AstNode::Declaration;
+use std::borrow::Borrow;
 
 pub struct Parser {
     tok: Tokenizer,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AstNode {
     Assign {
         id: String,
@@ -29,6 +33,7 @@ pub enum AstNode {
     Literal(Literal),
     Declaration {
         op: Keyword,
+        id: String,
         value: Box<AstNode>,
     },
     If {
@@ -43,7 +48,8 @@ pub enum AstNode {
     When,
     Jump {
         op: Keyword,
-    }, // break, return, continue
+    },
+    // break, return, continue
     Typeof {
         operand: Box<AstNode>,
     },
@@ -52,31 +58,7 @@ pub enum AstNode {
     // Export,
 }
 
-fn is_binary(token: &Token) -> bool {
-    if let Token::Sym(sym) = token {
-        [
-            Symbol::Bar,
-            Symbol::And,
-            Symbol::AndAnd,
-            Symbol::BarBar,
-            Symbol::EqualEqual,
-            Symbol::BangEqual,
-            Symbol::Less,
-            Symbol::LessEqual,
-            Symbol::GreaterEqual,
-            Symbol::Plus,
-            Symbol::Minus,
-            Symbol::Star,
-            Symbol::Slash,
-            Symbol::Percent,
-        ]
-        .contains(sym)
-    } else {
-        false
-    }
-}
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
     Int(i32),
     Double(f64),
@@ -84,6 +66,30 @@ pub enum Literal {
     Bool(bool),
     Struct,
     Fn,
+}
+
+fn is_binary(token: &Token) -> bool {
+    if let Token::Sym(sym) = token {
+        [
+            Bar,
+            And,
+            AndAnd,
+            BarBar,
+            EqualEqual,
+            BangEqual,
+            Less,
+            LessEqual,
+            GreaterEqual,
+            Plus,
+            Minus,
+            Star,
+            Slash,
+            Percent,
+        ]
+            .contains(sym)
+    } else {
+        false
+    }
 }
 
 impl Parser {
@@ -97,7 +103,7 @@ impl Parser {
         while self.tok.peek().is_some() {
             program.push(self.parse_exp(true));
 
-            self.tok.consume_expect(&Token::Sym(Symbol::Semicolon));
+            self.tok.consume_expect(&Token::Sym(Semicolon));
         }
 
         program
@@ -108,7 +114,7 @@ impl Parser {
         let exp = self.parse_exp_atom();
 
         if !compose {
-            return exp
+            return exp;
         }
 
 
@@ -129,16 +135,16 @@ impl Parser {
                         t if is_binary(t) => {
                             composed = self.make_binary(composed);
                             finished = false;
-                        },
-                        t if t == &Token::Sym(Symbol::Dot) => {
+                        }
+                        t if t == &Token::Sym(Dot) => {
                             composed = self.make_dot_access(composed);
                             finished = false;
-                        },
-                        t if t == &Token::Sym(Symbol::LeftParen) => {
+                        }
+                        t if t == &Token::Sym(LeftParen) => {
                             composed = self.make_call(composed);
                             finished = false;
-                        },
-                        t if t == &Token::Sym(Symbol::LeftBracket) => {
+                        }
+                        t if t == &Token::Sym(LeftBracket) => {
                             panic!("Bracket access not yet implemented.")
                         }
                         t => {
@@ -163,11 +169,42 @@ impl Parser {
     fn parse_exp_atom(&mut self) -> AstNode {
         if let Some(token) = self.tok.peek() {
             match token {
-                &Token::Sym(Symbol::LeftParen) => {
-                    self.tok.consume_expect(&Token::Sym(Symbol::LeftParen));
+                &Token::Sym(LeftParen) => {
+                    self.tok.consume_expect(&Token::Sym(LeftParen));
                     let node = self.parse_exp(true);
-                    self.tok.consume_expect(&Token::Sym(Symbol::LeftParen));
-                    return node;
+                    self.tok.consume_expect(&Token::Sym(RightParen));
+                    node
+                }
+                &Token::Sym(LeftBracket) => {
+                    panic!("List literal not yet implemented.")
+                }
+                &Token::Sym(Bang) => {
+                    self.tok.consume_expect(&Token::Sym(Bang));
+                    AstNode::Unary {
+                        op: Bang,
+                        operand: Box::from(self.parse_exp_atom()),
+                    }
+                }
+                &Token::Kw(Typeof) => {
+                    AstNode::Typeof {
+                        operand: Box::from(self.parse_exp_atom())
+                    }
+                }
+                &Token::Kw(If) => {
+                    panic!("If is not yet implemented.")
+                }
+                &Token::Kw(kw) if kw == Const || kw == Let => {
+                    self.tok.consume();
+                    if let Some(Token::Id(id)) = self.tok.consume() {
+                        self.tok.consume_expect(&Token::Sym(Equal));
+                        return Declaration {
+                            op: kw,
+                            id,
+                            value: Box::from(self.parse_exp_atom()),
+                        }
+                    } else {
+                        panic!("Expecting identifier but got {:?} at {}", self.tok.peek(), self.tok.loc())
+                    }
                 }
                 t => {
                     panic!("Unexpected token: {:?} at {}", t, self.tok.loc())

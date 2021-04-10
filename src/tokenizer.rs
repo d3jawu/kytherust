@@ -10,7 +10,7 @@ pub enum Token {
     Id(String),  // user-defined identifier
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Keyword {
     Const,
     Let,
@@ -26,7 +26,7 @@ pub enum Keyword {
     Export,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Symbol {
     Equal,
     PlusEqual,
