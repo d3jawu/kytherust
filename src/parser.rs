@@ -1,8 +1,6 @@
 use crate::tokenizer::*;
 use crate::tokenizer::Symbol::*;
 use crate::tokenizer::Keyword::*;
-use crate::parser::AstNode::Declaration;
-use std::borrow::Borrow;
 
 pub struct Parser {
     tok: Tokenizer,
@@ -46,10 +44,10 @@ pub enum AstNode {
         body: Box<AstNode>,
     },
     When,
+    // break, return, continue
     Jump {
         op: Keyword,
     },
-    // break, return, continue
     Typeof {
         operand: Box<AstNode>,
     },
@@ -188,10 +186,10 @@ impl Parser {
                     self.tok.consume();
                     if let Some(Token::Id(id)) = self.tok.consume() {
                         self.tok.consume_expect(&Token::Sym(Equal));
-                        return Declaration {
+                        return AstNode::Declaration {
                             op: kw,
                             id,
-                            value: Box::from(self.parse_exp_atom()),
+                            value: Box::from(self.parse_exp(true)),
                         };
                     } else {
                         panic!("Expecting identifier but got {:?} at {}", self.tok.peek(), self.tok.loc())
@@ -219,7 +217,30 @@ impl Parser {
     }
 
     fn make_call(&mut self, target: AstNode) -> AstNode {
-        panic!()
+        let mut args: Vec<AstNode> = Vec::new();
+        self.tok.consume_expect(&Token::Sym(LeftParen));
+
+        while let Some(token) = self.tok.peek() {
+            if token == &Token::Sym(RightParen) {
+                break;
+            }
+
+            args.push(self.parse_exp(true));
+
+            // trailing comma optional
+            if let Some(Token::Sym(RightParen)) = self.tok.peek() {
+                break;
+            } else {
+                self.tok.consume_expect(&Token::Sym(Comma));
+            }
+        }
+
+        self.tok.consume_expect(&Token::Sym(RightParen));
+
+        AstNode::Call {
+            arguments: args,
+            target: Box::from(target)
+        }
     }
 
     fn make_dot_access(&mut self, target: AstNode) -> AstNode {
