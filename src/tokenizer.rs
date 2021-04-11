@@ -26,7 +26,7 @@ pub enum Keyword {
     Export,
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub enum Symbol {
     Equal,
     PlusEqual,

@@ -2,16 +2,61 @@ use crate::tokenizer::*;
 use crate::tokenizer::Symbol::*;
 use crate::tokenizer::Keyword::*;
 
+use std::collections::HashMap;
+
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref OP_PRECEDENCE: HashMap<Symbol, u8> = {
+        let mut map = HashMap::new();
+
+        // TODO macro to factor out the repeated code
+        map.insert(Equal, 1);
+        map.insert(PlusEqual, 1);
+        map.insert(MinusEqual, 1);
+        map.insert(StarEqual, 1);
+        map.insert(SlashEqual, 1);
+        map.insert(PercentEqual, 1);
+
+        map.insert(BarBar, 3);
+        map.insert(AndAnd, 4);
+
+        map.insert(EqualEqual,8);
+        map.insert(BangEqual,8);
+
+        map.insert(Less,9);
+        map.insert(LessEqual,9);
+        map.insert(Greater,9);
+        map.insert(GreaterEqual,9);
+
+        map.insert(Plus,11);
+        map.insert(Minus,11);
+
+        map.insert(Star,12);
+        map.insert(Slash,12);
+        map.insert(Percent,12);
+
+        map.insert(Bang,14);
+
+        map.insert(Dot,16);
+        map.insert(LeftParen,16);
+        map.insert(RightParen,16);
+        map.insert(LeftBracket,16);
+        map.insert(RightBracket,16);
+        map.insert(LeftBrace,16);
+        map.insert(RightBrace,16);
+
+        map
+    };
+}
+
 pub struct Parser {
     tok: Tokenizer,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum AstNode {
-    Assign {
-        id: String,
-        rhs: Box<AstNode>,
-    },
+    // assignment is considered a binary node
     Binary {
         lhs: Box<AstNode>,
         op: Symbol,
@@ -128,7 +173,7 @@ impl Parser {
                             composed = self.make_call(composed);
                         }
                         t if is_binary(t) => {
-                            composed = self.make_binary(composed);
+                            composed = self.make_binary(composed, 0);
                         }
                         t if t == &Token::Sym(Dot) => {
                             composed = self.make_dot_access(composed);
@@ -212,8 +257,30 @@ impl Parser {
         }
     }
 
-    fn make_binary(&mut self, lhs: AstNode) -> AstNode {
-        panic!()
+    fn make_binary(&mut self, lhs: AstNode, precedence: u8) -> AstNode {
+        if let &Some(Token::Sym(op)) = self.tok.peek() {
+            if !OP_PRECEDENCE.contains_key(&op) {
+                // not a binary op, just return lhs
+                return lhs
+            }
+
+            let next_precedence = OP_PRECEDENCE[&op];
+            if next_precedence > precedence {
+                self.tok.consume();
+                let rhs_exp = self.parse_exp(false);
+                let rhs = self.make_binary(rhs_exp, next_precedence);
+
+                let binary = AstNode::Binary {
+                    lhs: Box::from(lhs),
+                    rhs: Box::from(rhs),
+                    op
+                };
+
+                return self.make_binary(binary, precedence);
+            }
+        }
+
+        lhs
     }
 
     fn make_call(&mut self, target: AstNode) -> AstNode {
@@ -239,7 +306,7 @@ impl Parser {
 
         AstNode::Call {
             arguments: args,
-            target: Box::from(target)
+            target: Box::from(target),
         }
     }
 
