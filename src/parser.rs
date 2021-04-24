@@ -5,6 +5,7 @@ use crate::tokenizer::Keyword::*;
 use std::collections::HashMap;
 
 use lazy_static::lazy_static;
+use crate::parser::AstNode::Access;
 
 lazy_static! {
     static ref OP_PRECEDENCE: HashMap<Symbol, u8> = {
@@ -97,6 +98,10 @@ pub enum AstNode {
         operand: Box<AstNode>,
     },
     Identifier(String),
+    Access {
+        target: Box<AstNode>,
+        field: String
+    }
     // Import,
     // Export,
 }
@@ -240,6 +245,23 @@ impl Parser {
                         panic!("Expecting identifier but got {:?} at {}", self.tok.peek(), self.tok.loc())
                     }
                 }
+                Token::Id(_) => {
+                    if let Some(Token::Id(id)) = self.tok.consume() {
+                        match id.as_str() {
+                            "true" => {
+                                AstNode::Literal(Literal::Bool(true))
+                            }
+                            "false" => {
+                                AstNode::Literal(Literal::Bool(false))
+                            }
+                            id => {
+                                AstNode::Identifier(String::from(id))
+                            }
+                        }
+                    } else {
+                        panic!("Expecting identifier but got {:?} at {}", self.tok.peek(), self.tok.loc())
+                    }
+                }
                 &Token::Int(n) => {
                     self.tok.consume_expect(&Token::Int(n));
                     AstNode::Literal(Literal::Int(n))
@@ -311,7 +333,15 @@ impl Parser {
     }
 
     fn make_dot_access(&mut self, target: AstNode) -> AstNode {
-        panic!()
+        self.tok.consume_expect(&Token::Sym(Dot));
+        if let Some(Token::Id(field)) = self.tok.peek() {
+            Access {
+                target: Box::from(target),
+                field: field.clone(),
+            }
+        } else {
+            panic!("Expected field identifier but got {:?} at {}", self.tok.peek(), self.tok.loc());
+        }
     }
 
     fn make_bracket_access(&mut self, target: AstNode) -> AstNode {

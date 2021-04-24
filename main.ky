@@ -1,1 +1,10 @@
-let x = 2 * 4 + 6;
+let myTrue = true;
+let myFalse = false;
+
+let notTrue = !true;
+let notFalse = !false;
+let notMyTrue = !myTrue;
+let notMyFalse = !myFalse;
+
+let orResult = myTrue || myFalse;
+let andResult = myTrue && myFalse;
