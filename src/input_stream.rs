@@ -66,20 +66,6 @@ impl InputStream {
         }
     }
 
-    // like peek, but panics if expected doesn't match
-    // panics on EOF, to check for EOF use eof()
-    pub fn peek_expect(&self, expected: &str) -> Option<String> {
-        let next = self
-            .peek()
-            .expect(format!("Expected {} but got EOF at {}", expected, self.loc()).as_str());
-
-        if next != expected {
-            panic!("Expected {} but got {} at {}", expected, next, self.loc());
-        }
-
-        Some(next)
-    }
-
     pub fn peek_next(&self) -> Option<String> {
         if self.pos + 1 >= self.body.len() {
             None

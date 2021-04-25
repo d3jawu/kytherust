@@ -100,8 +100,8 @@ pub enum AstNode {
     Identifier(String),
     Access {
         target: Box<AstNode>,
-        field: String
-    }
+        field: String,
+    },
     // Import,
     // Export,
 }
@@ -113,7 +113,15 @@ pub enum Literal {
     String(String),
     Bool(bool),
     Struct,
-    Fn,
+    StructType,
+    Fn {
+        param_names: Vec<String>,
+        body: Vec<AstNode>,
+    },
+    FnType {
+        param_types: Vec<AstNode>,
+        returns: Box<AstNode>,
+    },
 }
 
 fn is_binary(token: &Token) -> bool {
@@ -209,12 +217,53 @@ impl Parser {
             match token {
                 &Token::Sym(LeftParen) => {
                     self.tok.consume_expect(&Token::Sym(LeftParen));
+                    if let Some(next_tok) = self.tok.peek() {
+                        match next_tok {
+                            &Token::Sym(RightParen) => {
+                                // beginning of fn literal with no args
+                                return self.parse_fn_literal(&mut Vec::new())
+                            }
+                            _ => {
+                                // to figure out what this expression is, we need to see what's
+                                // after the next exp, so we hang on to it for now
+                                let next_exp = self.parse_exp(true);
+
+                                match self.tok.peek() {
+                                    Some(Token::Id(id)) => {
+                                        // if the next token is an identifier, that means we're seeing
+                                        // the beginning of a fn literal. We're picking up the identifier
+                                        // name after the type expression, e.g. "x" in (int x) => {}
+                                        return self.parse_fn_literal(&mut vec![next_exp])
+                                    }
+                                    Some(Token::Sym(Comma)) => {
+                                        // a comma immediately after means we just picked up the first
+                                        // type expression, e.g. (int, int,) => {}
+                                        panic!("fn type literal is not yet implemented.")
+                                    }
+                                    Some(Token::Sym(RightParen)) => {
+                                        // paren-wrapped expression, just return contents
+                                        self.tok.consume_expect(&Token::Sym(RightParen));
+                                        return next_exp;
+                                    }
+                                    Some(_) => {
+                                        panic!("Expected identifier, \",\", or \")\" {:?} at {}.", next_exp, self.tok.loc())
+                                    }
+                                    None => {
+                                        panic!("Unexpected EOF.")
+                                    }
+                                }
+                            }
+                        };
+                    } else {
+                        panic!("Unexpected EOF.")
+                    };
+
                     let node = self.parse_exp(true);
                     self.tok.consume_expect(&Token::Sym(RightParen));
                     node
                 }
                 &Token::Sym(LeftBracket) => {
-                    panic!("List literal not yet implemented.")
+                    panic!("List literal is not yet implemented.")
                 }
                 &Token::Sym(Bang) => {
                     self.tok.consume_expect(&Token::Sym(Bang));
@@ -283,7 +332,7 @@ impl Parser {
         if let &Some(Token::Sym(op)) = self.tok.peek() {
             if !OP_PRECEDENCE.contains_key(&op) {
                 // not a binary op, just return lhs
-                return lhs
+                return lhs;
             }
 
             let next_precedence = OP_PRECEDENCE[&op];
@@ -295,7 +344,7 @@ impl Parser {
                 let binary = AstNode::Binary {
                     lhs: Box::from(lhs),
                     rhs: Box::from(rhs),
-                    op
+                    op,
                 };
 
                 return self.make_binary(binary, precedence);
@@ -345,6 +394,96 @@ impl Parser {
     }
 
     fn make_bracket_access(&mut self, target: AstNode) -> AstNode {
-        panic!()
+        panic!("Bracket access is not is not yet implemented.")
+    }
+
+    // the parser should have already consumed the left-paren
+    // param_types may be pre-populated with the type exp of the first param
+    fn parse_fn_literal(&mut self, param_types: &mut Vec<AstNode>) -> AstNode {
+        let mut param_names: Vec<String> = Vec::new();
+
+        // if paramTypes is pre-populated, the next token is the param name and we need to grab that.
+        if param_types.len() == 1 {
+            if let Some(Token::Id(n)) = self.tok.peek() {
+                let name = n.clone();
+                param_names.push(name.clone());
+                self.tok.consume_expect(&Token::Id(name));
+            } else {
+                panic!("Expected parameter name but got {:?} at {}", self.tok.peek(), self.tok.loc())
+            }
+
+            // optionally consume comma
+            if let Some(Token::Sym(sym)) = self.tok.peek() {
+                match sym {
+                    Comma => {
+                        self.tok.consume_expect(&Token::Sym(Comma));
+                    }
+                    RightParen => {}
+                    _ => {
+                        panic!("Expected \",\" or \")\" after parameter but got {:?} at {}", self.tok.peek(), self.tok.loc())
+                    }
+                };
+            }
+        }
+
+        loop {
+            if let Some(Token::Sym(RightParen)) = self.tok.peek() {
+                break;
+            }
+
+            let param_type = self.parse_exp(true);
+            if let Some(Token::Id(p_n)) = self.tok.peek() {
+                let param_name = p_n.clone();
+                param_names.push(param_name.clone());
+                self.tok.consume_expect(&Token::Id(param_name));
+                param_types.push(param_type);
+                // optionally consume comma
+                if let Some(Token::Sym(sym)) = self.tok.peek() {
+                    match sym {
+                        Comma => {
+                            self.tok.consume_expect(&Token::Sym(Comma));
+                        }
+                        RightParen => {}
+                        _ => {
+                            panic!("Expected \",\" or \")\" after parameter but got {:?} at {}", self.tok.peek(), self.tok.loc())
+                        }
+                    };
+                }
+            } else {
+                panic!("Expecting parameter name but got {:?} at {}", self.tok.peek(), self.tok.loc())
+            }
+        }
+
+        self.tok.consume_expect(&Token::Sym(RightParen));
+
+        self.tok.consume_expect(&Token::Sym(Equal));
+        self.tok.consume_expect(&Token::Sym(Greater));
+
+        let body = self.parse_block();
+
+        AstNode::Literal(Literal::Fn{
+            param_names,
+            body,
+        })
+
+    }
+
+    fn parse_block(&mut self) -> Vec<AstNode> {
+        self.tok.consume_expect(&Token::Sym(LeftBrace));
+
+        let mut body: Vec<AstNode> = Vec::new();
+
+        loop {
+            if let Some(Token::Sym(RightBrace)) = self.tok.peek() {
+                break;
+            }
+
+            body.push(self.parse_exp(true));
+            self.tok.consume_expect(&Token::Sym(Semicolon));
+        }
+
+        self.tok.consume_expect(&Token::Sym(RightBrace));
+
+        body
     }
 }
