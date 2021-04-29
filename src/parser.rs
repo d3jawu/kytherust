@@ -93,6 +93,7 @@ pub enum AstNode {
     // break, return, continue
     Jump {
         op: Keyword,
+        result: Box<AstNode>,
     },
     Typeof {
         operand: Box<AstNode>,
@@ -108,6 +109,7 @@ pub enum AstNode {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
+    Unit,
     Int(i32),
     Double(f64),
     String(String),
@@ -229,7 +231,7 @@ impl Parser {
                                 let next_exp = self.parse_exp(true);
 
                                 match self.tok.peek() {
-                                    Some(Token::Id(id)) => {
+                                    Some(Token::Id(_)) => {
                                         // if the next token is an identifier, that means we're seeing
                                         // the beginning of a fn literal. We're picking up the identifier
                                         // name after the type expression, e.g. "x" in (int x) => {}
@@ -294,21 +296,17 @@ impl Parser {
                         panic!("Expecting identifier but got {:?} at {}", self.tok.peek(), self.tok.loc())
                     }
                 }
-                Token::Id(_) => {
-                    if let Some(Token::Id(id)) = self.tok.consume() {
-                        match id.as_str() {
-                            "true" => {
-                                AstNode::Literal(Literal::Bool(true))
-                            }
-                            "false" => {
-                                AstNode::Literal(Literal::Bool(false))
-                            }
-                            id => {
-                                AstNode::Identifier(String::from(id))
-                            }
-                        }
+                &Token::Kw(op) if op == Return || op == Continue || op == Break => {
+                    self.tok.consume();
+                    let next = if let Some(Token::Sym(Semicolon)) = self.tok.peek() {
+                        // return without value implicitly returns unit
+                        AstNode::Literal(Literal::Unit)
                     } else {
-                        panic!("Expecting identifier but got {:?} at {}", self.tok.peek(), self.tok.loc())
+                        self.parse_exp(true)
+                    };
+                    return AstNode::Jump {
+                        op,
+                        result: Box::from(next),
                     }
                 }
                 &Token::Int(n) => {
@@ -318,6 +316,26 @@ impl Parser {
                 &Token::Double(d) => {
                     self.tok.consume_expect(&Token::Double(d));
                     AstNode::Literal(Literal::Double(d))
+                }
+                Token::Id(_) => {
+                    if let Some(Token::Id(id)) = self.tok.consume() {
+                        match id.as_str() {
+                            "true" => {
+                                AstNode::Literal(Literal::Bool(true))
+                            }
+                            "false" => {
+                                AstNode::Literal(Literal::Bool(false))
+                            }
+                            "unit" => {
+                                AstNode::Literal(Literal::Unit)
+                            }
+                            id => {
+                                AstNode::Identifier(String::from(id))
+                            }
+                        }
+                    } else {
+                        panic!("Expecting identifier but got {:?} at {}", self.tok.peek(), self.tok.loc())
+                    }
                 }
                 t => {
                     panic!("Unexpected token: {:?} at {}", t, self.tok.loc())
@@ -393,7 +411,7 @@ impl Parser {
         }
     }
 
-    fn make_bracket_access(&mut self, target: AstNode) -> AstNode {
+    fn make_bracket_access(&mut self, _target: AstNode) -> AstNode {
         panic!("Bracket access is not is not yet implemented.")
     }
 

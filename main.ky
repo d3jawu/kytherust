@@ -54,13 +54,14 @@ let eqT = 0 == 0;
 let eqF = 0 == 1;
 
 let noParamFn = () => {
-    let z = 2;
+    return;
 };
 
-let oneParamFn = (Int x) => {
+let noParamFnResult = noParamFn();
+
+let oneParamFn = (Num x,) => {
     let result = x * 2;
+    return result;
 };
 
-let twoParamFn = (Int x, Int y,) => {
-    let result = x + y;
-};
+let oneParamFnResult = oneParamFn(3);
