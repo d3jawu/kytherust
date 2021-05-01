@@ -39,14 +39,6 @@ lazy_static! {
 
         map.insert(Bang,14);
 
-        map.insert(Dot,16);
-        map.insert(LeftParen,16);
-        map.insert(RightParen,16);
-        map.insert(LeftBracket,16);
-        map.insert(RightBracket,16);
-        map.insert(LeftBrace,16);
-        map.insert(RightBrace,16);
-
         map
     };
 }
@@ -137,6 +129,7 @@ fn is_binary(token: &Token) -> bool {
             BangEqual,
             Less,
             LessEqual,
+            Greater,
             GreaterEqual,
             Plus,
             Minus,
@@ -277,7 +270,7 @@ impl Parser {
                 &Token::Kw(Typeof) => {
                     self.tok.consume_expect(&Token::Kw(Typeof));
                     AstNode::Typeof {
-                        operand: Box::from(self.parse_exp_atom())
+                        operand: Box::from(self.parse_exp(true))
                     }
                 }
                 &Token::Kw(If) => {
@@ -356,7 +349,7 @@ impl Parser {
             let next_precedence = OP_PRECEDENCE[&op];
             if next_precedence > precedence {
                 self.tok.consume();
-                let rhs_exp = self.parse_exp(false);
+                let rhs_exp = self.parse_exp(true);
                 let rhs = self.make_binary(rhs_exp, next_precedence);
 
                 let binary = AstNode::Binary {

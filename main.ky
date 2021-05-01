@@ -53,6 +53,49 @@ let gteF = 0 >= 1;
 let eqT = 0 == 0;
 let eqF = 0 == 1;
 
+// tests for number operations
+let numVal1 = 1;
+let numVal2 = 1.01;
+
+let x = 10;
+let y = 5;
+
+// basic arithmetic
+let sum = x + y;
+let difference = x - y;
+let product = x * y;
+let quotient = x / y;
+let remainder = x % y;
+
+// compound expressions
+let compound1 = 1 + 2 * 3 + 4;
+let compound2 = 1 + 2 - 3 * 4 / 5 % 6;
+
+// comparison
+let ltT = 0 < 1;
+let ltF1 = 0 < 0;
+let ltF2 = 1 < 0;
+let lteT1 = 0 <= 1;
+let lteT2 = 1 <= 1;
+let lteF = 1 <= 0;
+
+let gtT = 1 > 0;
+let gtF1 = 1 > 1;
+let gtF2 = 0 > 1;
+let gteT1 = 1 >= 0;
+let gteT2 = 1 >= 1;
+let gteF = 0 >= 1;
+
+let eqT = 0 == 0;
+let eqF = 0 == 1;
+let neqT = 0 != 1;
+let neqF = 0 != 0;
+
+// type
+let numType1 = typeof numVal1;
+let numType2 = typeof numVal2;
+
+
 let noParamFn = () => {
     return;
 };
@@ -65,3 +108,12 @@ let oneParamFn = (Num x,) => {
 };
 
 let oneParamFnResult = oneParamFn(3);
+
+let testDeMorgans = (Bool a, Bool b,) => {
+    return (!(a || b) == (!a && !b)) && (!(a && b) == (!a || !b));
+};
+
+let dmTT = testDeMorgans(true, true);
+let dmTF = testDeMorgans(true, false);
+let dmFF = testDeMorgans(false, false);
+let dmFT = testDeMorgans(false, true);
