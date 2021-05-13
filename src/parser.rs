@@ -106,7 +106,7 @@ pub enum Literal {
     Double(f64),
     String(String),
     Bool(bool),
-    Struct,
+    Struct(HashMap<String, AstNode>),
     StructType,
     Fn {
         param_names: Vec<String>,
@@ -260,6 +260,36 @@ impl Parser {
                 &Token::Sym(LeftBracket) => {
                     panic!("List literal is not yet implemented.")
                 }
+                &Token::Sym(LeftBrace) => {
+                    // struct literal
+                    self.tok.consume_expect(&Token::Sym(LeftBrace));
+
+                    let mut result: HashMap<String, AstNode>= HashMap::new();
+                    while let Some(token) = self.tok.peek() {
+                        match token {
+                            Token::Id(k) => {
+                                let key = k.to_string();
+                                // self.tok.consume_expect(&Token::Id(key));
+                                self.tok.consume();
+                                self.tok.consume_expect(&Token::Sym(Colon));
+
+                                let exp = self.parse_exp(true);
+                                result.insert(key, exp);
+
+                                self.tok.consume_expect(&Token::Sym(Comma));
+                            }
+                            &Token::Sym(RightBrace) => {
+                                break;
+                            }
+                            _ => {
+                                panic!("Expected struct field name but got {:?} at {}", token, self.tok.loc())
+                            }
+                        }
+                    };
+
+                    self.tok.consume_expect(&Token::Sym(RightBrace));
+                    return AstNode::Literal(Literal::Struct(result));
+                }
                 &Token::Sym(Bang) => {
                     self.tok.consume_expect(&Token::Sym(Bang));
                     AstNode::Unary {
@@ -394,10 +424,12 @@ impl Parser {
 
     fn make_dot_access(&mut self, target: AstNode) -> AstNode {
         self.tok.consume_expect(&Token::Sym(Dot));
-        if let Some(Token::Id(field)) = self.tok.peek() {
+        if let Some(Token::Id(f)) = self.tok.peek() {
+            let field = f.clone();
+            self.tok.consume_expect(&Token::Id(f.to_string()));
             Access {
                 target: Box::from(target),
-                field: field.clone(),
+                field,
             }
         } else {
             panic!("Expected field identifier but got {:?} at {}", self.tok.peek(), self.tok.loc());

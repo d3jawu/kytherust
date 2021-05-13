@@ -117,3 +117,18 @@ let dmTT = testDeMorgans(true, true);
 let dmTF = testDeMorgans(true, false);
 let dmFF = testDeMorgans(false, false);
 let dmFT = testDeMorgans(false, true);
+
+let myStruct = {
+    x: 1,
+    y: 1.01,
+};
+
+let structType = typeof myStruct;
+
+let structMember1 = myStruct.x;
+let structMember2 = myStruct.y;
+
+let myStruct2 = {
+    y: 2.01,
+    x: 2,
+};
