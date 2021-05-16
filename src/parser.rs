@@ -63,9 +63,9 @@ pub enum AstNode {
         target: Box<AstNode>,
         arguments: Vec<AstNode>,
     },
-    Block {
-        body: Vec<AstNode>,
-    },
+    // Block {
+    //     body: Vec<AstNode>,
+    // },
     Literal(Literal),
     Declaration {
         op: Keyword,
@@ -216,7 +216,7 @@ impl Parser {
                         match next_tok {
                             &Token::Sym(RightParen) => {
                                 // beginning of fn literal with no args
-                                return self.parse_fn_literal(&mut Vec::new())
+                                return self.parse_fn_literal(&mut Vec::new());
                             }
                             _ => {
                                 // to figure out what this expression is, we need to see what's
@@ -228,7 +228,7 @@ impl Parser {
                                         // if the next token is an identifier, that means we're seeing
                                         // the beginning of a fn literal. We're picking up the identifier
                                         // name after the type expression, e.g. "x" in (int x) => {}
-                                        return self.parse_fn_literal(&mut vec![next_exp])
+                                        return self.parse_fn_literal(&mut vec![next_exp]);
                                     }
                                     Some(Token::Sym(Comma)) => {
                                         // a comma immediately after means we just picked up the first
@@ -252,10 +252,6 @@ impl Parser {
                     } else {
                         panic!("Unexpected EOF.")
                     };
-
-                    let node = self.parse_exp(true);
-                    self.tok.consume_expect(&Token::Sym(RightParen));
-                    node
                 }
                 &Token::Sym(LeftBracket) => {
                     panic!("List literal is not yet implemented.")
@@ -264,7 +260,7 @@ impl Parser {
                     // struct literal
                     self.tok.consume_expect(&Token::Sym(LeftBrace));
 
-                    let mut result: HashMap<String, AstNode>= HashMap::new();
+                    let mut result: HashMap<String, AstNode> = HashMap::new();
                     while let Some(token) = self.tok.peek() {
                         match token {
                             Token::Id(k) => {
@@ -330,7 +326,7 @@ impl Parser {
                     return AstNode::Jump {
                         op,
                         result: Box::from(next),
-                    }
+                    };
                 }
                 &Token::Int(n) => {
                     self.tok.consume_expect(&Token::Int(n));
@@ -426,7 +422,7 @@ impl Parser {
         self.tok.consume_expect(&Token::Sym(Dot));
         if let Some(Token::Id(f)) = self.tok.peek() {
             let field = f.clone();
-            self.tok.consume_expect(&Token::Id(f.to_string()));
+            self.tok.consume_expect(&Token::Id(field.to_string()));
             Access {
                 target: Box::from(target),
                 field,
@@ -504,11 +500,10 @@ impl Parser {
 
         let body = self.parse_block();
 
-        AstNode::Literal(Literal::Fn{
+        AstNode::Literal(Literal::Fn {
             param_names,
             body,
         })
-
     }
 
     fn parse_block(&mut self) -> Vec<AstNode> {
