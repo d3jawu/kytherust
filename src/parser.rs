@@ -63,9 +63,10 @@ pub enum AstNode {
         target: Box<AstNode>,
         arguments: Vec<AstNode>,
     },
-    // Block {
-    //     body: Vec<AstNode>,
-    // },
+    // necessary - a block is a node because it evaluates to a type
+    Block {
+        body: Vec<AstNode>,
+    },
     Literal(Literal),
     Declaration {
         op: Keyword,
@@ -107,10 +108,10 @@ pub enum Literal {
     String(String),
     Bool(bool),
     Struct(HashMap<String, AstNode>),
-    StructType,
+    StructType(HashMap<String, AstNode>),
     Fn {
         param_names: Vec<String>,
-        body: Vec<AstNode>,
+        body: Box<AstNode>,
     },
     FnType {
         param_types: Vec<AstNode>,
@@ -170,6 +171,7 @@ impl Parser {
 
         let mut composed: AstNode = exp;
 
+        // repeatedly attempt to grow the expression to the right until none are available
         loop {
             let next = self.tok.peek();
             let mut finished = false;
@@ -210,33 +212,36 @@ impl Parser {
     fn parse_exp_atom(&mut self) -> AstNode {
         if let Some(token) = self.tok.peek() {
             match token {
+                // n literal, fn type literal, or parenthesized expression
                 &Token::Sym(LeftParen) => {
                     self.tok.consume_expect(&Token::Sym(LeftParen));
                     if let Some(next_tok) = self.tok.peek() {
                         match next_tok {
+                            // beginning of fn literal with no args
                             &Token::Sym(RightParen) => {
-                                // beginning of fn literal with no args
                                 return self.parse_fn_literal(&mut Vec::new());
                             }
                             _ => {
-                                // to figure out what this expression is, we need to see what's
-                                // after the next exp, so we hang on to it for now
+                                // need to peek after the next exp, so hang on to it for now
                                 let next_exp = self.parse_exp(true);
 
                                 match self.tok.peek() {
+                                    // identifier means fn literal:
+                                    //    e.g. (int x) => {}
+                                    // next_exp-^   ^-id we just peeked
                                     Some(Token::Id(_)) => {
-                                        // if the next token is an identifier, that means we're seeing
-                                        // the beginning of a fn literal. We're picking up the identifier
-                                        // name after the type expression, e.g. "x" in (int x) => {}
                                         return self.parse_fn_literal(&mut vec![next_exp]);
                                     }
+                                    // comma means fn type literal:
+                                    //    e.g. (int, int,) => {}
+                                    // next_exp-^  ^- comma we just peeked
                                     Some(Token::Sym(Comma)) => {
-                                        // a comma immediately after means we just picked up the first
-                                        // type expression, e.g. (int, int,) => {}
                                         panic!("fn type literal is not yet implemented.")
                                     }
+                                    // next_exp is paren-wrapped expression
+                                    //     e.g. (1);
+                                    //  next_exp-^^- paren we just peeked
                                     Some(Token::Sym(RightParen)) => {
-                                        // paren-wrapped expression, just return contents
                                         self.tok.consume_expect(&Token::Sym(RightParen));
                                         return next_exp;
                                     }
@@ -253,39 +258,78 @@ impl Parser {
                         panic!("Unexpected EOF.")
                     };
                 }
+                // list literal
                 &Token::Sym(LeftBracket) => {
                     panic!("List literal is not yet implemented.")
                 }
+                // code block, struct literal, or struct type literal
                 &Token::Sym(LeftBrace) => {
-                    // struct literal
                     self.tok.consume_expect(&Token::Sym(LeftBrace));
 
-                    let mut result: HashMap<String, AstNode> = HashMap::new();
-                    while let Some(token) = self.tok.peek() {
-                        match token {
-                            Token::Id(k) => {
-                                let key = k.to_string();
-                                // self.tok.consume_expect(&Token::Id(key));
-                                self.tok.consume();
-                                self.tok.consume_expect(&Token::Sym(Colon));
+                    // hang onto first expression after brace
+                    let first_exp = self.parse_exp(true);
+                    // look at token after first exp
+                    match self.tok.peek() {
+                        // colon means struct literal
+                        &Some(Token::Sym(Colon)) => {
+                            let mut result: HashMap<String, AstNode> = HashMap::new();
 
-                                let exp = self.parse_exp(true);
-                                result.insert(key, exp);
+                            while let Some(token) = self.tok.peek() {
+                                match token {
+                                    // first run only, consume token following id in first_exp
+                                    Token::Sym(Colon) => {
+                                        self.tok.consume_expect(&Token::Sym(Colon));
 
-                                self.tok.consume_expect(&Token::Sym(Comma));
-                            }
-                            &Token::Sym(RightBrace) => {
-                                break;
-                            }
-                            _ => {
-                                panic!("Expected struct field name but got {:?} at {}", token, self.tok.loc())
-                            }
+                                        let exp = self.parse_exp(true);
+                                        if let AstNode::Identifier(ref key) = first_exp {
+
+                                            result.insert(key.clone(), exp);
+
+                                            self.tok.consume_expect(&Token::Sym(Comma));
+                                        } else {
+                                            panic!("Expecting identifier for first entry in struct but got {:?} at {}.", first_exp, self.tok.loc())
+                                        }
+                                    }
+                                    Token::Id(k) => {
+                                        let key = k.to_string();
+
+                                        // self.tok.consume_expect(&Token::Id(key));
+                                        self.tok.consume();
+                                        self.tok.consume_expect(&Token::Sym(Colon));
+
+                                        let exp = self.parse_exp(true);
+                                        result.insert(key, exp);
+
+                                        self.tok.consume_expect(&Token::Sym(Comma));
+                                    }
+                                    &Token::Sym(RightBrace) => {
+                                        break;
+                                    }
+                                    _ => {
+                                        panic!("Expected struct field name or '}}' but got {:?} at {}", token, self.tok.loc())
+                                    }
+                                }
+                            };
+
+                            self.tok.consume_expect(&Token::Sym(RightBrace));
+                            return AstNode::Literal(Literal::Struct(result));
+                        }
+                        // semicolon means code block
+                        &Some(Token::Sym(Semicolon)) => {
+                            self.tok.consume_expect(&Token::Sym(Semicolon));
+                            return self.parse_started_block(first_exp);
+                        }
+                        // another expression means struct type literal
+                        &Some(_) => {
+                            // TODO implement
+                            panic!("struct type literal not implemented")
+                        }
+                        None => {
+                            panic!("Expected ':', ';', or expression but got EOF.");
                         }
                     };
-
-                    self.tok.consume_expect(&Token::Sym(RightBrace));
-                    return AstNode::Literal(Literal::Struct(result));
                 }
+                // unary
                 &Token::Sym(Bang) => {
                     self.tok.consume_expect(&Token::Sym(Bang));
                     AstNode::Unary {
@@ -302,6 +346,7 @@ impl Parser {
                 &Token::Kw(If) => {
                     panic!("'if' is not yet implemented.")
                 }
+                // declaration
                 &Token::Kw(kw) if kw == Const || kw == Let => {
                     self.tok.consume();
                     if let Some(Token::Id(id)) = self.tok.consume() {
@@ -315,6 +360,7 @@ impl Parser {
                         panic!("Expecting identifier but got {:?} at {}", self.tok.peek(), self.tok.loc())
                     }
                 }
+                // control flow
                 &Token::Kw(op) if op == Return || op == Continue || op == Break => {
                     self.tok.consume();
                     let next = if let Some(Token::Sym(Semicolon)) = self.tok.peek() {
@@ -328,14 +374,17 @@ impl Parser {
                         result: Box::from(next),
                     };
                 }
+                // int literal
                 &Token::Int(n) => {
                     self.tok.consume_expect(&Token::Int(n));
                     AstNode::Literal(Literal::Int(n))
                 }
+                // double literal
                 &Token::Double(d) => {
                     self.tok.consume_expect(&Token::Double(d));
                     AstNode::Literal(Literal::Double(d))
                 }
+                // built-in constants
                 Token::Id(_) => {
                     if let Some(Token::Id(id)) = self.tok.consume() {
                         match id.as_str() {
@@ -348,6 +397,7 @@ impl Parser {
                             "unit" => {
                                 AstNode::Literal(Literal::Unit)
                             }
+                            // TODO: built-in type literals (Int, Double, etc)
                             id => {
                                 AstNode::Identifier(String::from(id))
                             }
@@ -502,14 +552,26 @@ impl Parser {
 
         AstNode::Literal(Literal::Fn {
             param_names,
-            body,
+            body: Box::from(body),
         })
     }
 
-    fn parse_block(&mut self) -> Vec<AstNode> {
+    fn parse_block(&mut self) -> AstNode {
         self.tok.consume_expect(&Token::Sym(LeftBrace));
 
+        let first_stmt = self.parse_exp(true);
+        self.tok.consume_expect(&Token::Sym(Semicolon));
+
+        return self.parse_started_block(first_stmt);
+    }
+
+    // parses block with first brace, statement, and semicolon already consumed.
+    // only uniquely used in parse_exp_atom, but made a function to factor out common code.
+    // see &Token::Sym(LeftBrace) match entry in parse_exp_atom
+    fn parse_started_block(&mut self, first_stmt: AstNode) -> AstNode {
         let mut body: Vec<AstNode> = Vec::new();
+
+        body.push(first_stmt);
 
         loop {
             if let Some(Token::Sym(RightBrace)) = self.tok.peek() {
@@ -522,6 +584,8 @@ impl Parser {
 
         self.tok.consume_expect(&Token::Sym(RightBrace));
 
-        body
+        AstNode::Block {
+            body,
+        }
     }
 }

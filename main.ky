@@ -132,3 +132,9 @@ let myStruct2 = {
     y: 2.01,
     x: 2,
 };
+
+let codeBlock = {
+	2;
+
+	x + y;
+};
