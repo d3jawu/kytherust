@@ -102,25 +102,25 @@ let noParamFn = () => {
 
 let noParamFnResult = noParamFn();
 
-let oneParamFn = (Num x,) => {
+let oneParamFn = (x: Int,) => {
     let result = x * 2;
     return result;
 };
 
-let oneParamFnResult = oneParamFn(3);
+let oneParamFnResult = oneParamFn(3,);
 
-let testDeMorgans = (Bool a, Bool b,) => {
+let testDeMorgans = (a: Bool, b: Bool,) => {
     return (!(a || b) == (!a && !b)) && (!(a && b) == (!a || !b));
 };
 
-let dmTT = testDeMorgans(true, true);
-let dmTF = testDeMorgans(true, false);
-let dmFF = testDeMorgans(false, false);
-let dmFT = testDeMorgans(false, true);
+let dmTT = testDeMorgans(true, true,);
+let dmTF = testDeMorgans(true, false,);
+let dmFF = testDeMorgans(false, false,);
+let dmFT = testDeMorgans(false, true,);
 
 let myStruct = {
-    x: 1,
-    y: 1.01,
+    x= 1,
+    y= 1.01,
 };
 
 let structType = typeof myStruct;
@@ -129,12 +129,16 @@ let structMember1 = myStruct.x;
 let structMember2 = myStruct.y;
 
 let myStruct2 = {
-    y: 2.01,
-    x: 2,
+    y= 2.01,
+    x= 2,
 };
 
 let codeBlock = {
-	2;
-
 	x + y;
+	2;
+};
+
+let myStructType = {
+	x: Int,
+	y: Int,
 };

@@ -217,26 +217,30 @@ impl Parser {
                     self.tok.consume_expect(&Token::Sym(LeftParen));
                     if let Some(next_tok) = self.tok.peek() {
                         match next_tok {
-                            // beginning of fn literal with no args
+                            // identifier means fn literal:
+                            //    e.g. (x: Int) => {}
+                            //          ^-id we just peeked
+                            // RightParen means fn literal with no args
                             &Token::Sym(RightParen) => {
-                                return self.parse_fn_literal(&mut Vec::new());
+                                return self.parse_fn_literal(None);
                             }
                             _ => {
                                 // need to peek after the next exp, so hang on to it for now
                                 let next_exp = self.parse_exp(true);
 
                                 match self.tok.peek() {
-                                    // identifier means fn literal:
-                                    //    e.g. (int x) => {}
-                                    // next_exp-^   ^-id we just peeked
-                                    Some(Token::Id(_)) => {
-                                        return self.parse_fn_literal(&mut vec![next_exp]);
-                                    }
                                     // comma means fn type literal:
                                     //    e.g. (int, int,) => {}
                                     // next_exp-^  ^- comma we just peeked
                                     Some(Token::Sym(Comma)) => {
                                         panic!("fn type literal is not yet implemented.")
+                                    }
+                                    Some(Token::Sym(Colon)) => {
+                                        if let AstNode::Identifier(ref param_name) = next_exp {
+                                            return self.parse_fn_literal(Some(param_name.clone()));
+                                        } else {
+                                            panic!("Expecting identifier for first parameter in function definition but got {:?} at {}.", next_exp, self.tok.loc())
+                                        }
                                     }
                                     // next_exp is paren-wrapped expression
                                     //     e.g. (1);
@@ -246,7 +250,7 @@ impl Parser {
                                         return next_exp;
                                     }
                                     Some(_) => {
-                                        panic!("Expected identifier, \",\", or \")\" {:?} at {}.", next_exp, self.tok.loc())
+                                        panic!("Expected identifier, \",\", or \")\" but got {:?} at {}.", next_exp, self.tok.loc())
                                     }
                                     None => {
                                         panic!("Unexpected EOF.")
@@ -270,19 +274,20 @@ impl Parser {
                     let first_exp = self.parse_exp(true);
                     // look at token after first exp
                     match self.tok.peek() {
-                        // colon means struct literal
-                        &Some(Token::Sym(Colon)) => {
+                        // equals means struct literal
+                        //    e.g. { x = 2, }
+                        // first_exp-^ ^- equal we just peeked
+                        &Some(Token::Sym(Equal)) => {
                             let mut result: HashMap<String, AstNode> = HashMap::new();
 
                             while let Some(token) = self.tok.peek() {
                                 match token {
                                     // first run only, consume token following id in first_exp
-                                    Token::Sym(Colon) => {
-                                        self.tok.consume_expect(&Token::Sym(Colon));
+                                    Token::Sym(Equal) => {
+                                        self.tok.consume_expect(&Token::Sym(Equal));
 
                                         let exp = self.parse_exp(true);
                                         if let AstNode::Identifier(ref key) = first_exp {
-
                                             result.insert(key.clone(), exp);
 
                                             self.tok.consume_expect(&Token::Sym(Comma));
@@ -295,7 +300,7 @@ impl Parser {
 
                                         // self.tok.consume_expect(&Token::Id(key));
                                         self.tok.consume();
-                                        self.tok.consume_expect(&Token::Sym(Colon));
+                                        self.tok.consume_expect(&Token::Sym(Equal));
 
                                         let exp = self.parse_exp(true);
                                         result.insert(key, exp);
@@ -314,15 +319,59 @@ impl Parser {
                             self.tok.consume_expect(&Token::Sym(RightBrace));
                             return AstNode::Literal(Literal::Struct(result));
                         }
+                        // colon means struct type literal
+                        //    e.g. { x: int, }
+                        // first_exp-^^- colon we just peeked
+                        &Some(Token::Sym(Colon)) => {
+                            let mut result: HashMap<String, AstNode> = HashMap::new();
+
+                            while let Some(token) = self.tok.peek() {
+                                match token {
+                                    // first run only, consume token following id in first_exp
+                                    Token::Sym(Colon) => {
+                                        self.tok.consume_expect(&Token::Sym(Colon));
+
+                                        if let AstNode::Identifier(ref key) = first_exp {
+                                            let type_exp = self.parse_exp(true);
+                                            result.insert(key.clone(), type_exp);
+
+                                            self.tok.consume_expect(&Token::Sym(Comma));
+                                        } else {
+                                            panic!("Expecting identifier for first entry in struct but got {:?} at {}.", first_exp, self.tok.loc())
+                                        }
+                                    }
+                                    Token::Id(k) => {
+                                        let key = k.to_string();
+
+                                        self.tok.consume();
+                                        self.tok.consume_expect(&Token::Sym(Colon));
+
+                                        let exp = self.parse_exp(true);
+                                        result.insert(key, exp);
+
+                                        self.tok.consume_expect(&Token::Sym(Comma));
+                                    }
+                                    &Token::Sym(RightBrace) => {
+                                        break;
+                                    }
+                                    _ => {
+                                        panic!("Expected struct field name or '}}' but got {:?} at {}", token, self.tok.loc())
+                                    }
+                                }
+                            };
+
+                            self.tok.consume_expect(&Token::Sym(RightBrace));
+                            return AstNode::Literal(Literal::StructType(result));
+                        }
                         // semicolon means code block
+                        //    e.g. { statement(); }
+                        // first_exp-^^^^^^^^^^ ^- semicolon we just peeked
                         &Some(Token::Sym(Semicolon)) => {
                             self.tok.consume_expect(&Token::Sym(Semicolon));
                             return self.parse_started_block(first_exp);
                         }
-                        // another expression means struct type literal
-                        &Some(_) => {
-                            // TODO implement
-                            panic!("struct type literal not implemented")
+                        Some(tok) => {
+                            panic!("Expected ':', ';', or expression but got {:?} at {}", tok, self.tok.loc())
                         }
                         None => {
                             panic!("Expected ':', ';', or expression but got EOF.");
@@ -452,12 +501,7 @@ impl Parser {
 
             args.push(self.parse_exp(true));
 
-            // trailing comma optional
-            if let Some(Token::Sym(RightParen)) = self.tok.peek() {
-                break;
-            } else {
-                self.tok.consume_expect(&Token::Sym(Comma));
-            }
+            self.tok.consume_expect(&Token::Sym(Comma));
         }
 
         self.tok.consume_expect(&Token::Sym(RightParen));
@@ -487,32 +531,18 @@ impl Parser {
     }
 
     // the parser should have already consumed the left-paren
-    // param_types may be pre-populated with the type exp of the first param
-    fn parse_fn_literal(&mut self, param_types: &mut Vec<AstNode>) -> AstNode {
+    // if first_param_name is present, that should have been consumed as well (but not the colon after it)
+    fn parse_fn_literal(&mut self, first_param_name: Option<String>) -> AstNode {
         let mut param_names: Vec<String> = Vec::new();
+        let mut param_types: Vec<AstNode> = Vec::new();
 
-        // if paramTypes is pre-populated, the next token is the param name and we need to grab that.
-        if param_types.len() == 1 {
-            if let Some(Token::Id(n)) = self.tok.peek() {
-                let name = n.clone();
-                param_names.push(name.clone());
-                self.tok.consume_expect(&Token::Id(name));
-            } else {
-                panic!("Expected parameter name but got {:?} at {}", self.tok.peek(), self.tok.loc())
-            }
-
-            // optionally consume comma
-            if let Some(Token::Sym(sym)) = self.tok.peek() {
-                match sym {
-                    Comma => {
-                        self.tok.consume_expect(&Token::Sym(Comma));
-                    }
-                    RightParen => {}
-                    _ => {
-                        panic!("Expected \",\" or \")\" after parameter but got {:?} at {}", self.tok.peek(), self.tok.loc())
-                    }
-                };
-            }
+        // if first parameter is provided, handle first type exp as well
+        if let Some(name) = first_param_name {
+            param_names.push(name.clone());
+            self.tok.consume_expect(&Token::Sym(Colon));
+            let first_type_exp = self.parse_exp(true);
+            param_types.push(first_type_exp);
+            self.tok.consume_expect(&Token::Sym(Comma));
         }
 
         loop {
@@ -520,24 +550,17 @@ impl Parser {
                 break;
             }
 
-            let param_type = self.parse_exp(true);
-            if let Some(Token::Id(p_n)) = self.tok.peek() {
-                let param_name = p_n.clone();
+            if let Some(Token::Id(param_name)) = self.tok.peek() {
+                println!("{}", param_name);
                 param_names.push(param_name.clone());
-                self.tok.consume_expect(&Token::Id(param_name));
+                self.tok.consume(); // consume id
+                println!("m");
+                self.tok.consume_expect(&Token::Sym(Colon));
+                println!("n");
+                let param_type = self.parse_exp(true);
                 param_types.push(param_type);
-                // optionally consume comma
-                if let Some(Token::Sym(sym)) = self.tok.peek() {
-                    match sym {
-                        Comma => {
-                            self.tok.consume_expect(&Token::Sym(Comma));
-                        }
-                        RightParen => {}
-                        _ => {
-                            panic!("Expected \",\" or \")\" after parameter but got {:?} at {}", self.tok.peek(), self.tok.loc())
-                        }
-                    };
-                }
+
+                self.tok.consume_expect(&Token::Sym(Comma));
             } else {
                 panic!("Expecting parameter name but got {:?} at {}", self.tok.peek(), self.tok.loc())
             }
@@ -545,6 +568,7 @@ impl Parser {
 
         self.tok.consume_expect(&Token::Sym(RightParen));
 
+        // =>
         self.tok.consume_expect(&Token::Sym(Equal));
         self.tok.consume_expect(&Token::Sym(Greater));
 
