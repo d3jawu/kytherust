@@ -230,10 +230,34 @@ impl Parser {
 
                                 match self.tok.peek() {
                                     // comma means fn type literal:
-                                    //    e.g. (int, int,) => {}
+                                    //    e.g. (Int, Int,) => Int
                                     // next_exp-^  ^- comma we just peeked
                                     Some(Token::Sym(Comma)) => {
-                                        panic!("fn type literal is not yet implemented.")
+                                        let mut param_types: Vec<AstNode> = Vec::new();
+                                        param_types.push(next_exp);
+                                        self.tok.consume_expect(&Token::Sym(Comma));
+
+                                        loop {
+                                            if let Some(Token::Sym(RightParen)) = self.tok.peek() {
+                                                break;
+                                            }
+
+                                            let param_type_exp = self.parse_exp(true);
+                                            param_types.push(param_type_exp);
+                                            self.tok.consume_expect(&Token::Sym(Comma));
+                                        }
+
+                                        self.tok.consume_expect(&Token::Sym(RightParen));
+
+                                        self.tok.consume_expect(&Token::Sym(Equal));
+                                        self.tok.consume_expect(&Token::Sym(Greater));
+
+                                        let return_type_exp = self.parse_exp(true);
+
+                                        return AstNode::Literal(Literal::FnType {
+                                            param_types,
+                                            returns: Box::from(return_type_exp)
+                                        });
                                     }
                                     Some(Token::Sym(Colon)) => {
                                         if let AstNode::Identifier(ref param_name) = next_exp {
@@ -551,12 +575,9 @@ impl Parser {
             }
 
             if let Some(Token::Id(param_name)) = self.tok.peek() {
-                println!("{}", param_name);
                 param_names.push(param_name.clone());
                 self.tok.consume(); // consume id
-                println!("m");
                 self.tok.consume_expect(&Token::Sym(Colon));
-                println!("n");
                 let param_type = self.parse_exp(true);
                 param_types.push(param_type);
 

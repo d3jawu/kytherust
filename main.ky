@@ -109,6 +109,8 @@ let oneParamFn = (x: Int,) => {
 
 let oneParamFnResult = oneParamFn(3,);
 
+let myFnType = (Int, Int,) => Int;
+
 let testDeMorgans = (a: Bool, b: Bool,) => {
     return (!(a || b) == (!a && !b)) && (!(a && b) == (!a || !b));
 };
